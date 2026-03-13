@@ -1,3 +1,7 @@
+## 0.1.1
+
+- Fix: AudioPlayerService was not initialized by SipHelper, causing no voice playback during calls.
+
 ## 0.1.0
 
 - Initial release.

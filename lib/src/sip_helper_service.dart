@@ -139,9 +139,10 @@ class SipHelper {
         AudioLevelService.instance.updateInputFromPcm16(pcm16Data);
       };
 
-      // ── Initialize sound service (ring tones, voice playback) ──
+      // ── Initialize sound service and audio player ──
 
       SoundService.instance.initialize();
+      await AudioPlayerService.instance.initialize();
 
       sipLog('[SipHelper] Initialized with server ${config.server}:${config.port}');
     } catch (e) {
