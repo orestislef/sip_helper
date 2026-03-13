@@ -3,8 +3,18 @@ description: >-
   A lightweight SIP/VoIP library for Flutter. SIP protocol (UDP),
   RTP audio transport, G.711 A-law codec, and Windows audio via WinMM FFI.
 version: 0.1.0
-homepage: https://github.com/orestislef/sip_helper
+homepage: https://orestislef.gr/
 repository: https://github.com/orestislef/sip_helper
+issue_tracker: https://github.com/orestislef/sip_helper/issues
+topics:
+  - sip
+  - voip
+  - rtp
+  - audio
+  - telephony
+
+platforms:
+  windows:
 
 environment:
   sdk: ^3.0.0
