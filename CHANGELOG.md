@@ -1,3 +1,7 @@
+## 0.1.2
+
+- Updated dependencies: ffi ^2.2.0, crypto ^3.0.7, lints ^6.1.0, test ^1.30.0.
+
 ## 0.1.1
 
 - Fix: AudioPlayerService was not initialized by SipHelper, causing no voice playback during calls.
