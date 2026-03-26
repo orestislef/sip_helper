@@ -1,3 +1,7 @@
+## 0.2.2
+
+- Fix: local IP detection now picks the interface that can route to the SIP server instead of grabbing the first `192.168.*` address. Uses UDP probe with TCP and NetworkInterface fallbacks.
+
 ## 0.2.1
 
 - Fix: add `rport` to all SIP Via headers for NAT traversal — fixes incoming calls failing with "unavailable".
