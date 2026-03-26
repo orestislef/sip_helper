@@ -1,8 +1,13 @@
-## 0.1.3
+## 0.2.0
 
-- Fix: hanging up an outgoing call while ringing now sends SIP CANCEL instead of BYE, so the remote side stops ringing.
+- Feature: call hold and resume via SIP re-INVITE (`holdCall`, `unholdCall`).
+- Feature: remote hold detection (HELD/RESUMED/REMOTE_HELD/REMOTE_RESUMED states).
+- Feature: `activeCalls` getter to query all current calls.
+- Feature: proper incoming re-INVITE handling with SDP direction negotiation.
+- Fix: hanging up an outgoing call while ringing now sends SIP CANCEL instead of BYE.
 - Fix: late 200 OK received after CANCEL is properly ACKed and followed by BYE.
-- Fix: 487 Request Terminated response is now ACKed correctly.
+- Fix: 487/486/603 final responses are now ACKed correctly.
+- Fix: ACK direction-aware for incoming call dialogs.
 
 ## 0.1.2
 

@@ -37,6 +37,7 @@ class UdpSipClient {
   final Map<String, SipCall> _activeCalls = {};
   final Map<String, _PendingInvite> _pendingInvites = {};
   final Set<String> _endedCallIds = {};
+  final Set<String> _holdPendingCallIds = {};
 
   bool _isRegistered = false;
   bool get isRegistered => _isRegistered;
@@ -54,6 +55,7 @@ class UdpSipClient {
   bool Function()? onRtpIsActive;
   int? Function()? onRtpGetLocalPort;
   Future<void> Function()? onMicrophoneStart;
+  void Function()? onMicrophoneStop;
   void Function()? onAudioCleanup;
 
   UdpSipClient({
@@ -264,21 +266,37 @@ class UdpSipClient {
         onRegistrationStateChanged?.call(true);
         _startKeepAlive();
       } else if (cseqMethod == 'INVITE') {
-        // 200 OK for our outgoing INVITE
         final callId = _getHeaderValue(message, 'Call-ID')?.trim();
         if (callId != null) {
           // Always ACK the 200 OK (required by SIP)
           await _sendAck(message, callId);
 
-          // But only set up audio if the call wasn't already ended (CANCEL/BYE sent)
           if (_endedCallIds.contains(callId)) {
+            // Late 200 OK for cancelled call — ACK then BYE
             sipLog('[SIP] Late 200 OK for cancelled call $callId — sending BYE');
-            // Per RFC 3261: ACK the 200 OK, then immediately send BYE
             await _sendBye(callId);
+          } else if (_holdPendingCallIds.remove(callId)) {
+            // 200 OK for our hold re-INVITE — just ACK, no RTP setup
+            final call = _activeCalls[callId];
+            if (call != null) {
+              call.isOnHold = true;
+              onCallStateChanged?.call(callId, 'HELD');
+            }
+            sipLog('[SIP] Hold confirmed for $callId');
           } else if (_activeCalls.containsKey(callId)) {
-            _activeCalls[callId]!.isConfirmed = true;
-            await _setupRtpFromSdp(message);
-            onCallStateChanged?.call(callId, 'CONFIRMED');
+            final call = _activeCalls[callId]!;
+            if (!call.isConfirmed) {
+              // Initial INVITE 200 OK
+              call.isConfirmed = true;
+              await _setupRtpFromSdp(message);
+              onCallStateChanged?.call(callId, 'CONFIRMED');
+            } else {
+              // Unhold re-INVITE 200 OK — resume audio
+              call.isOnHold = false;
+              await _setupRtpFromSdp(message);
+              onCallStateChanged?.call(callId, 'RESUMED');
+              sipLog('[SIP] Unhold confirmed for $callId');
+            }
           }
         }
       } else if (cseqMethod == 'BYE') {
@@ -303,16 +321,19 @@ class UdpSipClient {
       }
     } else if (statusLine.contains(' 487 ')) {
       // 487 Request Terminated — response to our CANCEL; ACK it
+      await _sendNon2xxAck(message);
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
-        await _sendAck(message, callId);
         _activeCalls.remove(callId);
         onCallStateChanged?.call(callId, 'ENDED');
       }
     } else if (statusLine.contains(' 486 ') ||
         statusLine.contains(' 603 ')) {
+      // Busy / Decline — ACK the final response
+      await _sendNon2xxAck(message);
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
+        _activeCalls.remove(callId);
         onCallStateChanged?.call(callId, 'DECLINED');
       }
     }
@@ -348,9 +369,9 @@ class UdpSipClient {
 
     if (fromLine == null || callId == null) return;
 
-    // If this call is already active, it's a re-INVITE — just accept it
+    // If this call is already active, it's a re-INVITE (possibly hold/unhold)
     if (_activeCalls.containsKey(callId)) {
-      _sendSimpleResponse(message, 200, 'OK');
+      _handleReInvite(message, callId);
       return;
     }
 
@@ -584,6 +605,8 @@ class UdpSipClient {
         isIncoming: true,
       );
       call.isConfirmed = true;
+      call.remoteRtpHost = remoteHost;
+      call.remoteRtpPort = remotePort;
       _activeCalls[callId] = call;
 
       // Send initial silence to open NAT/firewall pinhole
@@ -628,15 +651,222 @@ class UdpSipClient {
     if (call == null) return;
 
     // Outgoing call still ringing → send CANCEL (not BYE)
+    // Don't remove from _activeCalls here — the 487 response handler will do it
     if (!call.isIncoming && !call.isConfirmed) {
       await _sendCancel(call);
-      _activeCalls.remove(callId);
       return;
     }
 
     // Confirmed call → send BYE
     await _sendBye(callId);
   }
+
+  // ── Hold / Unhold ──────────────────────────────────────────
+
+  /// Put an active call on hold by sending re-INVITE with a=sendonly.
+  Future<void> holdCall(String callId) async {
+    final call = _activeCalls[callId];
+    if (call == null) {
+      onError?.call('No active call to hold: $callId');
+      return;
+    }
+
+    try {
+      // Stop microphone — don't send audio to a held call
+      onMicrophoneStop?.call();
+
+      _holdPendingCallIds.add(callId);
+      _cseq++;
+
+      String requestUri;
+      String fromLine;
+      String toLine;
+
+      if (call.isIncoming) {
+        requestUri = _extractSipUri(call.fromHeader) ?? 'sip:$_server';
+        fromLine = '${call.toHeader};tag=${call.localTag}';
+        toLine =
+            '${call.fromHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      } else {
+        requestUri = _extractSipUri(call.toHeader) ?? 'sip:$_server';
+        fromLine = '${call.fromHeader};tag=${call.localTag}';
+        toLine =
+            '${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      }
+
+      final rtpPort = onRtpGetLocalPort?.call() ?? 0;
+      final sdp = _buildSDP(rtpPort, direction: 'sendonly');
+      final sdpBytes = utf8.encode(sdp);
+
+      final buf = StringBuffer();
+      _w(buf, 'INVITE $requestUri SIP/2.0');
+      _w(buf,
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+      _w(buf, 'From: $fromLine');
+      _w(buf, 'To: $toLine');
+      _w(buf, 'Call-ID: $callId');
+      _w(buf, 'CSeq: $_cseq INVITE');
+      _w(buf, 'Contact: <sip:$_username@$_localIP:$_localPort>');
+      _w(buf, 'Max-Forwards: 70');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Type: application/sdp');
+      _w(buf, 'Content-Length: ${sdpBytes.length}');
+      _blank(buf);
+      buf.write(sdp);
+
+      await _sendMessage(buf.toString());
+      sipLog('[SIP] Hold re-INVITE sent for $callId');
+    } catch (e) {
+      _holdPendingCallIds.remove(callId);
+      onError?.call('Failed to hold call: $e');
+    }
+  }
+
+  /// Resume a held call by sending re-INVITE with a=sendrecv.
+  Future<void> unholdCall(String callId) async {
+    final call = _activeCalls[callId];
+    if (call == null) {
+      onError?.call('No active call to unhold: $callId');
+      return;
+    }
+
+    try {
+      // Re-initialize RTP to get a valid port for the SDP
+      await onRtpInitialize?.call();
+      final rtpPort = onRtpGetLocalPort?.call();
+      if (rtpPort == null) {
+        onError?.call('Failed to initialize RTP for unhold');
+        return;
+      }
+
+      _cseq++;
+
+      String requestUri;
+      String fromLine;
+      String toLine;
+
+      if (call.isIncoming) {
+        requestUri = _extractSipUri(call.fromHeader) ?? 'sip:$_server';
+        fromLine = '${call.toHeader};tag=${call.localTag}';
+        toLine =
+            '${call.fromHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      } else {
+        requestUri = _extractSipUri(call.toHeader) ?? 'sip:$_server';
+        fromLine = '${call.fromHeader};tag=${call.localTag}';
+        toLine =
+            '${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      }
+
+      final sdp = _buildSDP(rtpPort, direction: 'sendrecv');
+      final sdpBytes = utf8.encode(sdp);
+
+      final buf = StringBuffer();
+      _w(buf, 'INVITE $requestUri SIP/2.0');
+      _w(buf,
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+      _w(buf, 'From: $fromLine');
+      _w(buf, 'To: $toLine');
+      _w(buf, 'Call-ID: $callId');
+      _w(buf, 'CSeq: $_cseq INVITE');
+      _w(buf, 'Contact: <sip:$_username@$_localIP:$_localPort>');
+      _w(buf, 'Max-Forwards: 70');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Type: application/sdp');
+      _w(buf, 'Content-Length: ${sdpBytes.length}');
+      _blank(buf);
+      buf.write(sdp);
+
+      await _sendMessage(buf.toString());
+      sipLog('[SIP] Unhold re-INVITE sent for $callId');
+    } catch (e) {
+      onError?.call('Failed to unhold call: $e');
+    }
+  }
+
+  /// Handle incoming re-INVITE (remote hold/unhold or media update).
+  void _handleReInvite(String message, String callId) {
+    final call = _activeCalls[callId];
+    if (call == null) return;
+
+    try {
+      // Parse SDP direction
+      String remoteDirection = 'sendrecv';
+      final sdpStart = message.indexOf('\n\n');
+      if (sdpStart != -1) {
+        final remoteSdp = message.substring(sdpStart + 2);
+        final sdpInfo = _parseSdp(remoteSdp);
+        remoteDirection = sdpInfo['direction'] ?? 'sendrecv';
+      }
+
+      // Determine our response direction and update hold state
+      String responseDirection;
+      if (remoteDirection == 'sendonly') {
+        // Remote is putting us on hold
+        responseDirection = 'recvonly';
+        call.isRemoteHold = true;
+        onMicrophoneStop?.call();
+      } else if (remoteDirection == 'inactive') {
+        responseDirection = 'inactive';
+        call.isRemoteHold = true;
+        onMicrophoneStop?.call();
+      } else {
+        // Remote is resuming (sendrecv or recvonly)
+        responseDirection = 'sendrecv';
+        call.isRemoteHold = false;
+      }
+
+      // Build 200 OK with SDP
+      final rtpPort = onRtpGetLocalPort?.call() ?? 0;
+      final sdp = _buildSDP(rtpPort, direction: responseDirection);
+      final sdpBytes = utf8.encode(sdp);
+
+      final lines = message.split('\n');
+      final via = _findHeader(lines, 'Via:');
+      final from = _findHeader(lines, 'From:');
+      final to = _findHeader(lines, 'To:');
+      final callIdLine = _findHeader(lines, 'Call-ID:');
+      final cseq = _findHeader(lines, 'CSeq:');
+
+      // Add our tag to To if not present
+      final toWithTag = to.contains('tag=')
+          ? to
+          : '$to;tag=${call.localTag}';
+
+      final buf = StringBuffer();
+      _w(buf, 'SIP/2.0 200 OK');
+      _w(buf, 'Via: $via');
+      _w(buf, 'From: $from');
+      _w(buf, 'To: $toWithTag');
+      _w(buf, 'Call-ID: $callIdLine');
+      _w(buf, 'CSeq: $cseq');
+      _w(buf, 'Contact: <sip:$_username@$_localIP:$_localPort>');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Type: application/sdp');
+      _w(buf, 'Content-Length: ${sdpBytes.length}');
+      _blank(buf);
+      buf.write(sdp);
+
+      _sendMessage(buf.toString());
+
+      // Notify state change
+      if (call.isRemoteHold) {
+        onCallStateChanged?.call(callId, 'REMOTE_HELD');
+        sipLog('[SIP] Remote hold for $callId');
+      } else {
+        onCallStateChanged?.call(callId, 'REMOTE_RESUMED');
+        // Restart mic when remote unhold
+        onMicrophoneStart?.call();
+        sipLog('[SIP] Remote resumed for $callId');
+      }
+    } catch (e) {
+      // If re-INVITE handling fails, still try to respond
+      _sendSimpleResponse(message, 200, 'OK');
+      onError?.call('Error handling re-INVITE: $e');
+    }
+  }
+
+  /// Get a map of all active calls (read-only snapshot).
+  Map<String, SipCall> get activeCalls => Map.unmodifiable(_activeCalls);
 
   /// Send CANCEL for a pending outgoing INVITE.
   Future<void> _sendCancel(SipCall call) async {
@@ -711,30 +941,44 @@ class UdpSipClient {
     }
   }
 
-  // ── ACK (for outgoing calls) ──────────────────────────────
+  // ── ACK ─────────────────────────────────────────────────────
 
+  /// ACK for 2xx responses (initial INVITE and re-INVITE).
   Future<void> _sendAck(String responseMessage, String callId) async {
     try {
       final call = _activeCalls[callId];
       if (call == null) return;
 
-      // Extract To tag from 200 OK response
+      // Extract remote tag from 200 OK To header
       final toLine = _getHeaderValue(responseMessage, 'To') ?? '';
       final toTag = _extractTag(toLine);
       if (toTag.isNotEmpty) {
         call.remoteTag = toTag;
       }
 
-      final requestUri =
-          _extractSipUri(call.toHeader) ?? 'sip:$_server';
+      // Direction-aware From/To/RequestURI (same as BYE)
+      String requestUri;
+      String fromLine;
+      String toHeaderLine;
+
+      if (call.isIncoming) {
+        requestUri = _extractSipUri(call.fromHeader) ?? 'sip:$_server';
+        fromLine = '${call.toHeader};tag=${call.localTag}';
+        toHeaderLine =
+            '${call.fromHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      } else {
+        requestUri = _extractSipUri(call.toHeader) ?? 'sip:$_server';
+        fromLine = '${call.fromHeader};tag=${call.localTag}';
+        toHeaderLine =
+            '${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      }
 
       final buf = StringBuffer();
       _w(buf, 'ACK $requestUri SIP/2.0');
       _w(buf,
           'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
-      _w(buf, 'From: ${call.fromHeader};tag=${call.localTag}');
-      _w(buf,
-          'To: ${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}');
+      _w(buf, 'From: $fromLine');
+      _w(buf, 'To: $toHeaderLine');
       _w(buf, 'Call-ID: $callId');
       _w(buf, 'CSeq: $_cseq ACK');
       _w(buf, 'Max-Forwards: 70');
@@ -748,10 +992,43 @@ class UdpSipClient {
     }
   }
 
+  /// ACK for non-2xx final responses (487, 486, 603, etc.).
+  /// Constructed from the response headers directly.
+  Future<void> _sendNon2xxAck(String responseMessage) async {
+    try {
+      final from = _getHeaderValue(responseMessage, 'From') ?? '';
+      final to = _getHeaderValue(responseMessage, 'To') ?? '';
+      final callId = _getHeaderValue(responseMessage, 'Call-ID')?.trim() ?? '';
+      final cseqLine = _getHeaderValue(responseMessage, 'CSeq') ?? '';
+      final cseqNum = cseqLine.split(' ').first.trim();
+      final viaHeader = _getHeaderValue(responseMessage, 'Via') ?? '';
+      final branchMatch = RegExp(r'branch=([^\s;,]+)').firstMatch(viaHeader);
+      final branch = branchMatch?.group(1) ?? _generateBranch();
+      final requestUri = _extractSipUri(to) ?? 'sip:$_server';
+
+      final buf = StringBuffer();
+      _w(buf, 'ACK $requestUri SIP/2.0');
+      _w(buf, 'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=$branch');
+      _w(buf, 'From: $from');
+      _w(buf, 'To: $to');
+      _w(buf, 'Call-ID: $callId');
+      _w(buf, 'CSeq: $cseqNum ACK');
+      _w(buf, 'Max-Forwards: 70');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Length: 0');
+      _blank(buf);
+
+      await _sendMessage(buf.toString());
+    } catch (e) {
+      onError?.call('Failed to send ACK: $e');
+    }
+  }
+
   // ── SDP ───────────────────────────────────────────────────
 
-  /// Build SDP with proper \r\n line endings
-  String _buildSDP(int rtpPort) {
+  /// Build SDP with proper \r\n line endings.
+  /// [direction] can be 'sendrecv', 'sendonly', 'recvonly', or 'inactive'.
+  String _buildSDP(int rtpPort, {String direction = 'sendrecv'}) {
     final sessionId = DateTime.now().millisecondsSinceEpoch;
     final lines = [
       'v=0',
@@ -765,15 +1042,16 @@ class UdpSipClient {
       'a=rtpmap:101 telephone-event/8000',
       'a=fmtp:101 0-15',
       'a=ptime:20',
-      'a=sendrecv',
+      'a=$direction',
     ];
     return '${lines.join('\r\n')}\r\n';
   }
 
-  /// Parse SDP to extract host and port
+  /// Parse SDP to extract host, port, and media direction
   Map<String, String?> _parseSdp(String sdp) {
     String? host;
     String? port;
+    String? direction;
     for (final line in sdp.split('\n')) {
       final trimmed = line.trim();
       if (trimmed.startsWith('c=IN IP4 ')) {
@@ -783,11 +1061,18 @@ class UdpSipClient {
         final parts = trimmed.split(' ');
         if (parts.length >= 2) port = parts[1];
       }
+      if (trimmed == 'a=sendonly' ||
+          trimmed == 'a=recvonly' ||
+          trimmed == 'a=sendrecv' ||
+          trimmed == 'a=inactive') {
+        direction = trimmed.substring(2); // strip 'a='
+      }
     }
-    return {'host': host, 'port': port};
+    return {'host': host, 'port': port, 'direction': direction};
   }
 
-  /// Setup RTP from SDP in a 200 OK response (outgoing calls)
+  /// Setup RTP from SDP in a 200 OK response.
+  /// Also stores remote RTP endpoint in the SipCall for hold/resume.
   Future<void> _setupRtpFromSdp(String message) async {
     try {
       final sdpStart = message.indexOf('\n\n');
@@ -796,6 +1081,16 @@ class UdpSipClient {
       final sdpInfo = _parseSdp(remoteSdp);
       final remoteHost = sdpInfo['host'];
       final remotePort = int.tryParse(sdpInfo['port'] ?? '');
+
+      // Store remote RTP endpoint in the call for hold/resume
+      final callId = _getHeaderValue(message, 'Call-ID')?.trim();
+      if (callId != null) {
+        final call = _activeCalls[callId];
+        if (call != null && remoteHost != null && remotePort != null) {
+          call.remoteRtpHost = remoteHost;
+          call.remoteRtpPort = remotePort;
+        }
+      }
 
       // Only initialize RTP if not already active (makeCall already initialized)
       if (!(onRtpIsActive?.call() ?? false)) {
@@ -941,6 +1236,7 @@ class UdpSipClient {
     _activeCalls.clear();
     _pendingInvites.clear();
     _endedCallIds.clear();
+    _holdPendingCallIds.clear();
     onRegistrationStateChanged?.call(false);
   }
 

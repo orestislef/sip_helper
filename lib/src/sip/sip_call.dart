@@ -17,6 +17,18 @@ class SipCall {
   /// CSeq number used in the INVITE (needed for CANCEL).
   int? inviteCSeq;
 
+  /// Whether we placed this call on hold.
+  bool isOnHold = false;
+
+  /// Whether the remote side placed us on hold.
+  bool isRemoteHold = false;
+
+  /// Remote RTP host (stored for hold/resume).
+  String? remoteRtpHost;
+
+  /// Remote RTP port (stored for hold/resume).
+  int? remoteRtpPort;
+
   SipCall({
     required this.callId,
     required this.fromHeader,

@@ -4,6 +4,7 @@ import 'logging.dart';
 import 'models/sip_configuration.dart';
 import 'models/call_info.dart';
 import 'sip/udp_sip_client.dart';
+import 'sip/sip_call.dart';
 import 'rtp/rtp_session.dart';
 import 'audio/audio_player_service.dart';
 import 'audio/microphone_service.dart';
@@ -113,6 +114,12 @@ class SipHelper {
         await MicrophoneService.instance.startCapture();
       };
 
+      _client!.onMicrophoneStop = () {
+        try {
+          MicrophoneService.instance.stopCapture();
+        } catch (_) {}
+      };
+
       _client!.onAudioCleanup = () {
         try {
           MicrophoneService.instance.stopCapture();
@@ -217,6 +224,32 @@ class SipHelper {
       rethrow;
     }
   }
+
+  /// Put an active call on hold (sends re-INVITE with a=sendonly).
+  Future<void> holdCall(String callId) async {
+    if (_client == null) return;
+
+    try {
+      await _client!.holdCall(callId);
+    } catch (e) {
+      _errorController.add('Failed to hold call: ${e.toString()}');
+    }
+  }
+
+  /// Resume a held call (sends re-INVITE with a=sendrecv).
+  Future<void> unholdCall(String callId) async {
+    if (_client == null) return;
+
+    try {
+      await _client!.unholdCall(callId);
+    } catch (e) {
+      _errorController.add('Failed to unhold call: ${e.toString()}');
+    }
+  }
+
+  /// Get all active calls from the SIP client.
+  Map<String, SipCall> get activeCalls =>
+      _client?.activeCalls ?? {};
 
   /// Cleanup
   void dispose() {
