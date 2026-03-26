@@ -1,3 +1,7 @@
+## 0.2.3
+
+- Fix: local IP detection — TCP connect to server is now the primary method (OS picks correct route). Falls back to subnet matching, then interface name heuristic. Fixes wrong IP on machines with Hyper-V/WSL virtual adapters.
+
 ## 0.2.2
 
 - Fix: local IP detection now picks the interface that can route to the SIP server instead of grabbing the first `192.168.*` address. Uses UDP probe with TCP and NetworkInterface fallbacks.
