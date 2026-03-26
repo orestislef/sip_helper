@@ -87,30 +87,10 @@ class UdpSipClient {
     try {
       _serverAddress = (await InternetAddress.lookup(_server)).first;
 
-      // Get local IP by creating a temporary connection
-      try {
-        final tempSocket = await Socket.connect(
-          _serverAddress!, _port,
-          timeout: const Duration(seconds: 2),
-        );
-        _localIP = tempSocket.address.address;
-        tempSocket.destroy();
-      } catch (_) {
-        // Fallback: get local interfaces
-        final interfaces = await NetworkInterface.list(
-          type: InternetAddressType.IPv4,
-        );
-        for (var iface in interfaces) {
-          for (var addr in iface.addresses) {
-            if (!addr.isLoopback && addr.address.startsWith('192.168')) {
-              _localIP = addr.address;
-              break;
-            }
-          }
-          if (_localIP != null) break;
-        }
-        _localIP ??= '0.0.0.0';
-      }
+      // Detect the local IP that can reach the SIP server.
+      // Try a temporary UDP socket first (lightweight, no handshake),
+      // then fall back to a TCP connect which lets the OS pick the route.
+      _localIP = await _getLocalIp();
 
       // Bind to any available port
       _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
@@ -1324,6 +1304,49 @@ class UdpSipClient {
   String? _extractSipUri(String headerValue) {
     final match = RegExp(r'<?(sip:[^>;]+)>?').firstMatch(headerValue);
     return match?.group(1);
+  }
+
+  // ── Local IP detection ──────────────────────────────────────
+
+  /// Detect the local IP address that has a route to the SIP server.
+  /// Opens a temporary UDP socket, sends a dummy byte so the OS selects the
+  /// correct interface, then reads back the local address.  Falls back to a
+  /// TCP connect (which always works) if the UDP socket reports 0.0.0.0.
+  Future<String> _getLocalIp() async {
+    // 1. Try UDP – lightweight, no handshake required.
+    try {
+      final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      udp.send([0], _serverAddress!, _port);
+      final addr = udp.address.address;
+      udp.close();
+      if (addr != '0.0.0.0') return addr;
+    } catch (_) {}
+
+    // 2. Fall back to TCP connect – the OS picks the right interface and
+    //    Socket.address exposes the local end of the connection.
+    try {
+      final tcp = await Socket.connect(
+        _serverAddress!, _port,
+        timeout: const Duration(seconds: 2),
+      );
+      final ip = tcp.address.address;
+      tcp.destroy();
+      if (ip != '0.0.0.0') return ip;
+    } catch (_) {}
+
+    // 3. Last resort: scan network interfaces for a non-loopback IPv4 address.
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+      );
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          if (!addr.isLoopback) return addr.address;
+        }
+      }
+    } catch (_) {}
+
+    return '0.0.0.0';
   }
 
   // ── ID generators ─────────────────────────────────────────
