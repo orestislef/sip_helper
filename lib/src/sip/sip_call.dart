@@ -8,6 +8,15 @@ class SipCall {
   String? remoteTag;
   final bool isIncoming;
 
+  /// Whether the call dialog is fully established (200 OK exchanged).
+  bool isConfirmed = false;
+
+  /// Branch used in the INVITE Via header (needed for CANCEL).
+  String? inviteBranch;
+
+  /// CSeq number used in the INVITE (needed for CANCEL).
+  int? inviteCSeq;
+
   SipCall({
     required this.callId,
     required this.fromHeader,
@@ -16,5 +25,7 @@ class SipCall {
     this.localTag,
     this.remoteTag,
     this.isIncoming = false,
+    this.inviteBranch,
+    this.inviteCSeq,
   });
 }

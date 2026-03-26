@@ -1,3 +1,9 @@
+## 0.1.3
+
+- Fix: hanging up an outgoing call while ringing now sends SIP CANCEL instead of BYE, so the remote side stops ringing.
+- Fix: late 200 OK received after CANCEL is properly ACKed and followed by BYE.
+- Fix: 487 Request Terminated response is now ACKed correctly.
+
 ## 0.1.2
 
 - Updated dependencies: ffi ^2.2.0, crypto ^3.0.7, lints ^6.1.0, test ^1.30.0.

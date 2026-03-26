@@ -270,10 +270,13 @@ class UdpSipClient {
           // Always ACK the 200 OK (required by SIP)
           await _sendAck(message, callId);
 
-          // But only set up audio if the call wasn't already ended (BYE sent)
+          // But only set up audio if the call wasn't already ended (CANCEL/BYE sent)
           if (_endedCallIds.contains(callId)) {
-            sipLog('[SIP] Ignoring late 200 OK for ended call $callId');
+            sipLog('[SIP] Late 200 OK for cancelled call $callId — sending BYE');
+            // Per RFC 3261: ACK the 200 OK, then immediately send BYE
+            await _sendBye(callId);
           } else if (_activeCalls.containsKey(callId)) {
+            _activeCalls[callId]!.isConfirmed = true;
             await _setupRtpFromSdp(message);
             onCallStateChanged?.call(callId, 'CONFIRMED');
           }
@@ -298,8 +301,15 @@ class UdpSipClient {
         onRegistrationStateChanged?.call(false);
         onError?.call('Registration forbidden — wrong credentials');
       }
+    } else if (statusLine.contains(' 487 ')) {
+      // 487 Request Terminated — response to our CANCEL; ACK it
+      final callId = _getHeaderValue(message, 'Call-ID')?.trim();
+      if (callId != null) {
+        await _sendAck(message, callId);
+        _activeCalls.remove(callId);
+        onCallStateChanged?.call(callId, 'ENDED');
+      }
     } else if (statusLine.contains(' 486 ') ||
-        statusLine.contains(' 487 ') ||
         statusLine.contains(' 603 ')) {
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
@@ -565,7 +575,7 @@ class UdpSipClient {
       sipLog('[SIP] 200 OK sent for $callId, RTP port: $rtpPort');
       sipLog('[SIP] Remote RTP: $remoteHost:$remotePort');
       _pendingInvites.remove(callId);
-      _activeCalls[callId] = SipCall(
+      final call = SipCall(
         callId: callId,
         fromHeader: fromNoTag, // Remote party (without tag)
         toHeader: toBase,      // Us (without tag)
@@ -573,6 +583,8 @@ class UdpSipClient {
         remoteTag: remoteTag,
         isIncoming: true,
       );
+      call.isConfirmed = true;
+      _activeCalls[callId] = call;
 
       // Send initial silence to open NAT/firewall pinhole
       try {
@@ -597,13 +609,13 @@ class UdpSipClient {
   // ── Hangup ────────────────────────────────────────────────
 
   Future<void> hangupCall(String callId) async {
-    // Mark call as ended so late 200 OKs are ignored
+    // Mark call as ended so late 200 OKs trigger BYE instead of audio setup
     _endedCallIds.add(callId);
 
     // Stop audio
     _cleanupAudio();
 
-    // If pending (not answered yet), reject with 486 Busy Here
+    // If pending incoming (not answered yet), reject with 486 Busy Here
     final pending = _pendingInvites[callId];
     if (pending != null) {
       _sendResponseWithTag(
@@ -612,51 +624,90 @@ class UdpSipClient {
       return;
     }
 
-    // If active, send BYE
     final call = _activeCalls[callId];
-    if (call != null) {
-      try {
-        _cseq++;
+    if (call == null) return;
 
-        // Determine Request-URI and From/To based on call direction
-        String requestUri;
-        String fromLine;
-        String toLine;
+    // Outgoing call still ringing → send CANCEL (not BYE)
+    if (!call.isIncoming && !call.isConfirmed) {
+      await _sendCancel(call);
+      _activeCalls.remove(callId);
+      return;
+    }
 
-        if (call.isIncoming) {
-          // We are UAS: From=us(To header), To=them(From header)
-          requestUri = _extractSipUri(call.fromHeader) ?? 'sip:$_server';
-          fromLine = '${call.toHeader};tag=${call.localTag}';
-          toLine =
-              '${call.fromHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
-        } else {
-          // We are UAC: From=us(From header), To=them(To header)
-          requestUri = _extractSipUri(call.toHeader) ?? 'sip:$_server';
-          fromLine = '${call.fromHeader};tag=${call.localTag}';
-          toLine =
-              '${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
-        }
+    // Confirmed call → send BYE
+    await _sendBye(callId);
+  }
 
-        final buf = StringBuffer();
-        _w(buf, 'BYE $requestUri SIP/2.0');
-        _w(buf,
-            'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
-        _w(buf, 'From: $fromLine');
-        _w(buf, 'To: $toLine');
-        _w(buf, 'Call-ID: $callId');
-        _w(buf, 'CSeq: $_cseq BYE');
-        _w(buf, 'Contact: <sip:$_username@$_localIP:$_localPort>');
-        _w(buf, 'Max-Forwards: 70');
-        _w(buf, 'User-Agent: IQ-SIP');
-        _w(buf, 'Content-Length: 0');
-        _blank(buf);
+  /// Send CANCEL for a pending outgoing INVITE.
+  Future<void> _sendCancel(SipCall call) async {
+    try {
+      final requestUri =
+          _extractSipUri(call.toHeader) ?? 'sip:$_server';
 
-        await _sendMessage(buf.toString());
-      } catch (e) {
-        onError?.call('Failed to send BYE: $e');
-      } finally {
-        _activeCalls.remove(callId);
+      final buf = StringBuffer();
+      _w(buf, 'CANCEL $requestUri SIP/2.0');
+      // CANCEL must reuse the same branch as the INVITE it cancels
+      _w(buf,
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${call.inviteBranch}');
+      _w(buf, 'From: "$_displayName" ${call.fromHeader};tag=${call.localTag}');
+      _w(buf, 'To: ${call.toHeader}');
+      _w(buf, 'Call-ID: ${call.callId}');
+      // CANCEL must use the same CSeq number as the INVITE, with method CANCEL
+      _w(buf, 'CSeq: ${call.inviteCSeq} CANCEL');
+      _w(buf, 'Max-Forwards: 70');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Length: 0');
+      _blank(buf);
+
+      await _sendMessage(buf.toString());
+    } catch (e) {
+      onError?.call('Failed to send CANCEL: $e');
+    }
+  }
+
+  /// Send BYE for a confirmed call.
+  Future<void> _sendBye(String callId) async {
+    final call = _activeCalls[callId];
+    if (call == null) return;
+
+    try {
+      _cseq++;
+
+      String requestUri;
+      String fromLine;
+      String toLine;
+
+      if (call.isIncoming) {
+        requestUri = _extractSipUri(call.fromHeader) ?? 'sip:$_server';
+        fromLine = '${call.toHeader};tag=${call.localTag}';
+        toLine =
+            '${call.fromHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
+      } else {
+        requestUri = _extractSipUri(call.toHeader) ?? 'sip:$_server';
+        fromLine = '${call.fromHeader};tag=${call.localTag}';
+        toLine =
+            '${call.toHeader}${call.remoteTag != null ? ";tag=${call.remoteTag}" : ""}';
       }
+
+      final buf = StringBuffer();
+      _w(buf, 'BYE $requestUri SIP/2.0');
+      _w(buf,
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+      _w(buf, 'From: $fromLine');
+      _w(buf, 'To: $toLine');
+      _w(buf, 'Call-ID: $callId');
+      _w(buf, 'CSeq: $_cseq BYE');
+      _w(buf, 'Contact: <sip:$_username@$_localIP:$_localPort>');
+      _w(buf, 'Max-Forwards: 70');
+      _w(buf, 'User-Agent: IQ-SIP');
+      _w(buf, 'Content-Length: 0');
+      _blank(buf);
+
+      await _sendMessage(buf.toString());
+    } catch (e) {
+      onError?.call('Failed to send BYE: $e');
+    } finally {
+      _activeCalls.remove(callId);
     }
   }
 
@@ -810,6 +861,8 @@ class UdpSipClient {
         toHeader: to,
         localTag: outTag,
         isIncoming: false,
+        inviteBranch: outBranch,
+        inviteCSeq: _cseq,
       );
 
       onCallStateChanged?.call(outCallId, 'CALLING');
@@ -859,6 +912,9 @@ class UdpSipClient {
       buf.write(sdp);
 
       await _sendMessage(buf.toString());
+      // Update stored branch/CSeq so CANCEL matches the authenticated INVITE
+      call.inviteBranch = newBranch;
+      call.inviteCSeq = _cseq;
       sipLog('[SIP] Re-sent INVITE with auth for $callId');
     } catch (e) {
       onError?.call('Failed to resend INVITE with auth: $e');
