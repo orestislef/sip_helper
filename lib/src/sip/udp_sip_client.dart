@@ -1313,32 +1313,70 @@ class UdpSipClient {
   /// correct interface, then reads back the local address.  Falls back to a
   /// TCP connect (which always works) if the UDP socket reports 0.0.0.0.
   Future<String> _getLocalIp() async {
-    // 1. Try UDP – lightweight, no handshake required.
-    try {
-      final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-      udp.send([0], _serverAddress!, _port);
-      final addr = udp.address.address;
-      udp.close();
-      if (addr != '0.0.0.0') return addr;
-    } catch (_) {}
-
-    // 2. Fall back to TCP connect – the OS picks the right interface and
-    //    Socket.address exposes the local end of the connection.
+    // 1. TCP connect — most reliable. The OS routes to the server and
+    //    Socket.address gives us the local IP of that connection.
     try {
       final tcp = await Socket.connect(
-        _serverAddress!, _port,
+        _server, _port,
         timeout: const Duration(seconds: 2),
       );
       final ip = tcp.address.address;
       tcp.destroy();
-      if (ip != '0.0.0.0') return ip;
+      if (ip != '0.0.0.0') {
+        sipLog('[SIP] Local IP detected via TCP connect: $ip');
+        return ip;
+      }
+    } catch (e) {
+      sipLog('[SIP] TCP IP detection failed: $e');
+    }
+
+    // 2. UDP connected socket — bind, connect (no send needed),
+    //    then read the local address the OS assigned.
+    try {
+      final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      udp.send([0], InternetAddress(_server), _port);
+      // The bind address won't help — we need to check interfaces
+      // that share a subnet with the server instead.
+      udp.close();
     } catch (_) {}
 
-    // 3. Last resort: scan network interfaces for a non-loopback IPv4 address.
+    // 3. Match subnet: find the interface on the same /24 as the server.
+    try {
+      final serverParts = _server.split('.');
+      if (serverParts.length == 4) {
+        final serverPrefix = '${serverParts[0]}.${serverParts[1]}.${serverParts[2]}.';
+        final interfaces = await NetworkInterface.list(
+          type: InternetAddressType.IPv4,
+        );
+        for (final iface in interfaces) {
+          for (final addr in iface.addresses) {
+            if (addr.address.startsWith(serverPrefix)) {
+              sipLog('[SIP] Local IP detected via subnet match: ${addr.address}');
+              return addr.address;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 4. Last resort: first non-loopback IPv4 with a name containing common patterns.
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
       );
+      // Prefer interfaces with "Ethernet" or "Wi-Fi" in the name
+      for (final iface in interfaces) {
+        final name = iface.name.toLowerCase();
+        if (name.contains('ethernet') || name.contains('wi-fi') || name.contains('wifi')) {
+          for (final addr in iface.addresses) {
+            if (!addr.isLoopback) {
+              sipLog('[SIP] Local IP detected via interface name ($name): ${addr.address}');
+              return addr.address;
+            }
+          }
+        }
+      }
+      // Any non-loopback
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
           if (!addr.isLoopback) return addr.address;
