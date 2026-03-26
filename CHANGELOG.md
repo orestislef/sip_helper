@@ -1,3 +1,8 @@
+## 0.2.1
+
+- Fix: add `rport` to all SIP Via headers for NAT traversal — fixes incoming calls failing with "unavailable".
+- Fix: send 100 Trying immediately on incoming INVITE before 180 Ringing to prevent server timeout.
+
 ## 0.2.0
 
 - Feature: call hold and resume via SIP re-INVITE (`holdCall`, `unholdCall`).

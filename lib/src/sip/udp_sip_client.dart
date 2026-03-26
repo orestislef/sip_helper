@@ -153,7 +153,7 @@ class UdpSipClient {
     final uri = 'sip:$_server';
     final from = '<sip:$_username@$_server>';
     final to = '<sip:$_username@$_server>';
-    final via = 'SIP/2.0/UDP $_localIP:$_localPort;branch=$_branch';
+    final via = 'SIP/2.0/UDP $_localIP:$_localPort;rport;branch=$_branch';
     final contact = '<sip:$_username@$_localIP:$_localPort>';
 
     final buf = StringBuffer();
@@ -395,6 +395,9 @@ class UdpSipClient {
       rawMessage: message,
       localTag: localTag,
     );
+
+    // Send 100 Trying immediately (prevents server timeout)
+    _sendSimpleResponse(message, 100, 'Trying');
 
     onIncomingCall?.call(callerNumber, callId);
 
@@ -701,7 +704,7 @@ class UdpSipClient {
       final buf = StringBuffer();
       _w(buf, 'INVITE $requestUri SIP/2.0');
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=${_generateBranch()}');
       _w(buf, 'From: $fromLine');
       _w(buf, 'To: $toLine');
       _w(buf, 'Call-ID: $callId');
@@ -763,7 +766,7 @@ class UdpSipClient {
       final buf = StringBuffer();
       _w(buf, 'INVITE $requestUri SIP/2.0');
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=${_generateBranch()}');
       _w(buf, 'From: $fromLine');
       _w(buf, 'To: $toLine');
       _w(buf, 'Call-ID: $callId');
@@ -878,7 +881,7 @@ class UdpSipClient {
       _w(buf, 'CANCEL $requestUri SIP/2.0');
       // CANCEL must reuse the same branch as the INVITE it cancels
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${call.inviteBranch}');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=${call.inviteBranch}');
       _w(buf, 'From: "$_displayName" ${call.fromHeader};tag=${call.localTag}');
       _w(buf, 'To: ${call.toHeader}');
       _w(buf, 'Call-ID: ${call.callId}');
@@ -922,7 +925,7 @@ class UdpSipClient {
       final buf = StringBuffer();
       _w(buf, 'BYE $requestUri SIP/2.0');
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=${_generateBranch()}');
       _w(buf, 'From: $fromLine');
       _w(buf, 'To: $toLine');
       _w(buf, 'Call-ID: $callId');
@@ -976,7 +979,7 @@ class UdpSipClient {
       final buf = StringBuffer();
       _w(buf, 'ACK $requestUri SIP/2.0');
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=${_generateBranch()}');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=${_generateBranch()}');
       _w(buf, 'From: $fromLine');
       _w(buf, 'To: $toHeaderLine');
       _w(buf, 'Call-ID: $callId');
@@ -1008,7 +1011,7 @@ class UdpSipClient {
 
       final buf = StringBuffer();
       _w(buf, 'ACK $requestUri SIP/2.0');
-      _w(buf, 'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=$branch');
+      _w(buf, 'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=$branch');
       _w(buf, 'From: $from');
       _w(buf, 'To: $to');
       _w(buf, 'Call-ID: $callId');
@@ -1133,7 +1136,7 @@ class UdpSipClient {
       final buf = StringBuffer();
       _w(buf, 'INVITE $uri SIP/2.0');
       _w(buf,
-          'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=$outBranch');
+          'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=$outBranch');
       _w(buf, 'From: "$_displayName" $from;tag=$outTag');
       _w(buf, 'To: $to');
       _w(buf, 'Call-ID: $outCallId');
@@ -1191,7 +1194,7 @@ class UdpSipClient {
 
       final buf = StringBuffer();
       _w(buf, 'INVITE $uri SIP/2.0');
-      _w(buf, 'Via: SIP/2.0/UDP $_localIP:$_localPort;branch=$newBranch');
+      _w(buf, 'Via: SIP/2.0/UDP $_localIP:$_localPort;rport;branch=$newBranch');
       _w(buf, 'From: "$_displayName" ${call.fromHeader};tag=${call.localTag}');
       _w(buf, 'To: ${call.toHeader}');
       _w(buf, 'Call-ID: $callId');
