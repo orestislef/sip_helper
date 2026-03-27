@@ -51,12 +51,13 @@ void main() async {
   sip.soundService.setOutputGain(5.0);   // 500% output gain
   sip.microphoneService.setInputGain(1.0); // 100% input gain
 
-  // 8. Audio device selection (Windows)
-  final outputs = WinAudioDevices.getOutputDevices();
+  // 8. Audio device selection (cross-platform)
+  final platform = AudioPlatform.instance;
+  final outputs = platform.devices.getOutputDevices();
   for (int i = 0; i < outputs.length; i++) {
     print('Output [$i]: ${outputs[i]}');
   }
-  final inputs = WinAudioDevices.getInputDevices();
+  final inputs = platform.devices.getInputDevices();
   for (int i = 0; i < inputs.length; i++) {
     print('Input [$i]: ${inputs[i]}');
   }

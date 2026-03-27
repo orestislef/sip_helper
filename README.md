@@ -8,7 +8,7 @@ A lightweight SIP/VoIP library for Dart. Implements the SIP protocol over UDP wi
 - **SIP Digest Auth** - MD5 challenge-response authentication (RFC 2617)
 - **RTP Audio** - RTP/AVP transport for real-time audio streaming
 - **G.711 A-law Codec** - PCMA encoder/decoder (ITU-T G.711)
-- **Windows Audio** - Native WinMM API (waveOut/waveIn) via Dart FFI
+- **Cross-Platform Audio** - Pluggable audio backend (WinMM on Windows, extensible to other platforms)
 - **Bluetooth Support** - Automatic A2DP to HFP profile switching for call audio
 - **Audio Device Selection** - Enumerate and select input/output devices
 - **Gain Controls** - Adjustable input/output gain
@@ -19,13 +19,15 @@ A lightweight SIP/VoIP library for Dart. Implements the SIP protocol over UDP wi
 
 ## Platform Support
 
-| Platform | Status |
-|----------|--------|
+| Platform | Audio Status |
+|----------|-------------|
 | Windows  | Supported (WinMM FFI) |
-| macOS    | Not yet supported |
-| Linux    | Not yet supported |
+| macOS    | SIP/RTP works, audio backend not yet implemented |
+| Linux    | SIP/RTP works, audio backend not yet implemented |
+| Android  | SIP/RTP works, audio backend not yet implemented |
+| iOS      | SIP/RTP works, audio backend not yet implemented |
 
-> Audio capture and playback use the Windows Multimedia (WinMM) API via `dart:ffi`. Other platforms will require platform-specific audio backends.
+> SIP signaling, RTP transport, and codecs are pure Dart and work on all platforms. Audio capture/playback requires a platform-specific backend. Windows uses WinMM via `dart:ffi`. Other platforms can register custom backends via `AudioPlatform.override()`.
 
 ## Getting Started
 
@@ -100,20 +102,25 @@ lib/
       microphone_service.dart          # Microphone capture
       audio_level.dart                 # Real-time level computation
     platform/
+      audio_platform.dart             # Abstract audio interfaces
+      audio_platform_registry.dart    # Platform auto-detection
       windows/
-        win32_audio.dart               # WinMM FFI bindings
+        win32_audio.dart              # WinMM FFI bindings
+        win32_audio_backend.dart      # WinMM adapter
+      stub/
+        stub_audio_backend.dart       # No-op fallback
 ```
 
 ### Audio Pipeline
 
 **Outgoing (Mic → Network):**
 ```
-WinMM waveIn (8kHz PCM16) → Input Gain → PCMA Encode → RTP Send
+Platform Audio In (8kHz PCM16) → Input Gain → PCMA Encode → RTP Send
 ```
 
 **Incoming (Network → Speaker):**
 ```
-RTP Receive → PCMA Decode (8kHz PCM16) → Upsample 2x (16kHz) → Output Gain → WinMM waveOut
+RTP Receive → PCMA Decode (8kHz PCM16) → Upsample 2x (16kHz) → Output Gain → Platform Audio Out
 ```
 
 ## API Reference
@@ -167,8 +174,9 @@ SipConfiguration(
 
 ```dart
 // List available devices
-final outputs = WinAudioDevices.getOutputDevices();
-final inputs = WinAudioDevices.getInputDevices();
+final platform = AudioPlatform.instance;
+final outputs = platform.devices.getOutputDevices();
+final inputs = platform.devices.getInputDevices();
 
 // Select devices by index
 sip.soundService.setOutputDevice(0);
@@ -205,7 +213,7 @@ sipLogger = print;
 ## Requirements
 
 - **Dart SDK** >= 3.0.0
-- **Windows 10/11** for audio features (WinMM API)
+- **Windows 10/11** for built-in audio (WinMM). Other platforms: SIP/RTP works, bring your own audio backend.
 - **SIP Server** — Asterisk, FreeSWITCH, or any RFC 3261 compliant server
 
 ## License

@@ -1,3 +1,12 @@
+## 0.3.0
+
+- **Breaking:** cross-platform audio abstraction — `WinAudioPlayer`, `WinAudioRecorder`, `WinAudioDevices` are no longer exported from the barrel file. Use `AudioPlatform.instance.createPlayer()`, `AudioPlatform.instance.createRecorder()`, and `AudioPlatform.instance.devices` instead.
+- New abstract interfaces: `AudioPlayer`, `AudioRecorder`, `AudioDevices` for platform-agnostic audio.
+- `AudioPlatform` singleton auto-detects the platform at runtime (Windows → WinMM, others → stub).
+- Custom audio backends can be registered via `AudioPlatform.override()`.
+- Removed `platforms: windows:` restriction — SIP/RTP/codec now works on all Dart platforms.
+- Stub backend allows graceful degradation on unsupported platforms (audio returns `false` from `open()`).
+
 ## 0.2.3
 
 - Fix: local IP detection — TCP connect to server is now the primary method (OS picks correct route). Falls back to subnet matching, then interface name heuristic. Fixes wrong IP on machines with Hyper-V/WSL virtual adapters.
