@@ -1,19 +1,19 @@
 import 'dart:typed_data';
 import '../logging.dart';
-import '../platform/windows/win32_audio.dart';
+import '../platform/audio_platform_registry.dart';
 import '../codec/pcma_encoder.dart';
 
 /// Microphone capture service for VoIP calls.
 ///
-/// Uses Windows WinMM waveIn API for direct PCM capture from microphone.
-/// Encodes PCM16 -> PCMA and delivers via callbacks. No Flutter plugin dependencies.
+/// Captures PCM16 audio from the platform microphone, encodes to PCMA,
+/// and delivers via callbacks. No Flutter plugin dependencies.
 class MicrophoneService {
   static final MicrophoneService instance = MicrophoneService._internal();
   MicrophoneService._internal();
 
-  WinAudioRecorder? _recorder;
+  AudioRecorder? _recorder;
   bool _isRecording = false;
-  int _inputDeviceId = 0xFFFFFFFF; // WAVE_MAPPER (system default)
+  int _inputDeviceId = defaultAudioDeviceId;
 
   // Input gain (1.0 = normal, up to 10.0 = 1000%)
   double _inputGain = 1.0;
@@ -32,7 +32,7 @@ class MicrophoneService {
     _inputDeviceId = deviceId;
     if (_isRecording) {
       _recorder?.close();
-      _recorder = WinAudioRecorder(deviceId: _inputDeviceId);
+      _recorder = AudioPlatform.instance.createRecorder(deviceId: _inputDeviceId);
       _recorder!.onData = _processAudioData;
       if (!_recorder!.open()) {
         _isRecording = false;
@@ -47,14 +47,14 @@ class MicrophoneService {
   Future<void> startCapture() async {
     if (_isRecording) return;
 
-    _recorder = WinAudioRecorder(deviceId: _inputDeviceId);
+    _recorder = AudioPlatform.instance.createRecorder(deviceId: _inputDeviceId);
     _recorder!.onData = _processAudioData;
 
     if (_recorder!.open()) {
       _isRecording = true;
-      sipLog('[Microphone] Capture started via WinMM');
+      sipLog('[Microphone] Capture started');
     } else {
-      sipLog('[Microphone] Failed to open WinMM recording device');
+      sipLog('[Microphone] Failed to open recording device');
     }
   }
 

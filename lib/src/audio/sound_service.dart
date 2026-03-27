@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import '../logging.dart';
-import '../platform/windows/win32_audio.dart';
+import '../platform/audio_platform_registry.dart';
 
 /// Available ring tone styles
 enum RingTone {
@@ -15,8 +15,8 @@ enum RingTone {
 
 /// Generates and plays ringing, ringback, DTMF, and voice audio.
 ///
-/// Uses a SINGLE persistent WinAudioPlayer for ALL output.
-/// This avoids issues where closing one waveOut handle breaks others.
+/// Uses a SINGLE persistent [AudioPlayer] for ALL output.
+/// This avoids issues where closing one output handle breaks others.
 class SoundService {
   static final SoundService instance = SoundService._internal();
   SoundService._internal();
@@ -33,11 +33,11 @@ class SoundService {
   late final Uint8List _voiceStartTone; // diagnostic beep on voice start
   bool _initialized = false;
 
-  int _outputDeviceId = 0xFFFFFFFF;
+  int _outputDeviceId = defaultAudioDeviceId;
   RingTone _selectedRingTone = RingTone.chime;
 
   // ── Single persistent player ──
-  WinAudioPlayer? _player;
+  AudioPlayer? _player;
 
   // Ring state (incoming call)
   Timer? _ringTimer;
@@ -74,12 +74,12 @@ class SoundService {
 
     // Log available output devices for debugging
     try {
-      final devices = WinAudioDevices.getOutputDevices();
+      final devices = AudioPlatform.instance.devices.getOutputDevices();
       sipLog('[SipSound] ═══ Output devices ═══');
       for (int i = 0; i < devices.length; i++) {
         sipLog('[SipSound]   [$i] ${devices[i]}');
       }
-      sipLog('[SipSound]   Selected: $_outputDeviceId (${_outputDeviceId == 0xFFFFFFFF ? "WAVE_MAPPER" : _outputDeviceId.toString()})');
+      sipLog('[SipSound]   Selected: $_outputDeviceId (${_outputDeviceId == defaultAudioDeviceId ? "default" : _outputDeviceId.toString()})');
     } catch (_) {}
 
     _ringTones[RingTone.chime] = _buildChimeRing();
@@ -97,7 +97,7 @@ class SoundService {
 
   void _openPlayer() {
     _player?.close();
-    _player = WinAudioPlayer(
+    _player = AudioPlatform.instance.createPlayer(
       numBuffers: _numBufs,
       bufferSize: _bufSize,
       sampleRate: _sampleRate,
@@ -110,9 +110,9 @@ class SoundService {
     }
     _player!.setMaxVolume();
     // Log device name for debugging
-    String deviceName = 'WAVE_MAPPER (system default)';
-    if (_outputDeviceId != 0xFFFFFFFF) {
-      final devices = WinAudioDevices.getOutputDevices();
+    String deviceName = 'system default';
+    if (_outputDeviceId != defaultAudioDeviceId) {
+      final devices = AudioPlatform.instance.devices.getOutputDevices();
       if (_outputDeviceId < devices.length) {
         deviceName = devices[_outputDeviceId];
       } else {
@@ -242,7 +242,7 @@ class SoundService {
 
     // Re-enumerate devices (Bluetooth may have switched A2DP→HFP)
     try {
-      final devices = WinAudioDevices.getOutputDevices();
+      final devices = AudioPlatform.instance.devices.getOutputDevices();
       sipLog('[SipSound] Voice start — re-enumerating output devices:');
       for (int i = 0; i < devices.length; i++) {
         sipLog('[SipSound]   [$i] ${devices[i]}');
@@ -272,11 +272,11 @@ class SoundService {
     _player?.close();
     _player = null;
 
-    final devices = WinAudioDevices.getOutputDevices();
+    final devices = AudioPlatform.instance.devices.getOutputDevices();
 
     // Check if selected device is a Bluetooth A2DP (Stereo) device
     // If so, find and use the corresponding Hands-Free device instead
-    if (_outputDeviceId != 0xFFFFFFFF && _outputDeviceId < devices.length) {
+    if (_outputDeviceId != defaultAudioDeviceId && _outputDeviceId < devices.length) {
       final selectedName = devices[_outputDeviceId].toLowerCase();
       if (selectedName.contains('stereo')) {
         // Find the Hands-Free variant of the same device
@@ -285,7 +285,7 @@ class SoundService {
           if (i != _outputDeviceId && name.contains('hands-free') &&
               _sharesBluetoothDevice(selectedName, name)) {
             sipLog('[SipSound] BT A2DP→HFP switch: using device $i (${devices[i]}) instead of $_outputDeviceId (${devices[_outputDeviceId]})');
-            _player = WinAudioPlayer(
+            _player = AudioPlatform.instance.createPlayer(
               numBuffers: _numBufs,
               bufferSize: _bufSize,
               sampleRate: _sampleRate,
@@ -302,22 +302,22 @@ class SoundService {
       }
     }
 
-    // Try WAVE_MAPPER (system default) — Windows may route correctly
-    _player = WinAudioPlayer(
+    // Try system default device
+    _player = AudioPlatform.instance.createPlayer(
       numBuffers: _numBufs,
       bufferSize: _bufSize,
       sampleRate: _sampleRate,
-      deviceId: 0xFFFFFFFF,
+      deviceId: defaultAudioDeviceId,
     );
     if (_player!.open()) {
       _player!.setMaxVolume();
-      sipLog('[SipSound] Voice player opened on WAVE_MAPPER');
+      sipLog('[SipSound] Voice player opened on default device');
       return;
     }
 
     // Try the user-selected device as last resort
-    if (_outputDeviceId != 0xFFFFFFFF) {
-      _player = WinAudioPlayer(
+    if (_outputDeviceId != defaultAudioDeviceId) {
+      _player = AudioPlatform.instance.createPlayer(
         numBuffers: _numBufs,
         bufferSize: _bufSize,
         sampleRate: _sampleRate,

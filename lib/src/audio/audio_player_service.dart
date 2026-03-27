@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import '../logging.dart';
 import '../codec/pcma_decoder.dart';
+import '../platform/audio_platform.dart';
 import 'sound_service.dart';
 
 /// Real-time audio playback service for VoIP calls.
@@ -12,7 +13,7 @@ class AudioPlayerService {
   AudioPlayerService._internal();
 
   bool _isReady = false;
-  int _outputDeviceId = 0xFFFFFFFF;
+  int _outputDeviceId = defaultAudioDeviceId;
   int _packetCount = 0;
   int _dropCount = 0;
 

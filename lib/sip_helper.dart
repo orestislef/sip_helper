@@ -1,7 +1,7 @@
 /// A lightweight SIP/VoIP library for Dart.
 ///
 /// Provides SIP protocol signaling (UDP), RTP audio transport,
-/// G.711 A-law (PCMA) codec, and Windows native audio via WinMM FFI.
+/// G.711 A-law (PCMA) codec, and platform-native audio I/O.
 ///
 /// ```dart
 /// import 'package:sip_helper/sip_helper.dart';
@@ -40,8 +40,9 @@ export 'src/audio/audio_player_service.dart';
 export 'src/audio/microphone_service.dart';
 export 'src/audio/sound_service.dart';
 
-// Platform - Windows
-export 'src/platform/windows/win32_audio.dart';
+// Platform audio abstraction
+export 'src/platform/audio_platform.dart';
+export 'src/platform/audio_platform_registry.dart';
 
 // Orchestrator
 export 'src/sip_helper_service.dart';
