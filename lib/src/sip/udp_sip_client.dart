@@ -216,7 +216,7 @@ class UdpSipClient {
     final cseqMethod = _getCSeqMethod(message);
 
     if (statusLine.contains(' 401 ')) {
-      // Unauthorized — need to authenticate
+      // Unauthorized, need to authenticate
       final nonce = _extractQuotedValue(message, 'nonce');
       final realm = _extractQuotedValue(message, 'realm');
       final qop = _extractQuotedValue(message, 'qop');
@@ -252,11 +252,11 @@ class UdpSipClient {
           await _sendAck(message, callId);
 
           if (_endedCallIds.contains(callId)) {
-            // Late 200 OK for cancelled call — ACK then BYE
-            sipLog('[SIP] Late 200 OK for cancelled call $callId — sending BYE');
+            // Late 200 OK for cancelled call, ACK then BYE
+            sipLog('[SIP] Late 200 OK for cancelled call $callId, sending BYE');
             await _sendBye(callId);
           } else if (_holdPendingCallIds.remove(callId)) {
-            // 200 OK for our hold re-INVITE — just ACK, no RTP setup
+            // 200 OK for our hold re-INVITE, just ACK, no RTP setup
             final call = _activeCalls[callId];
             if (call != null) {
               call.isOnHold = true;
@@ -271,7 +271,7 @@ class UdpSipClient {
               await _setupRtpFromSdp(message);
               onCallStateChanged?.call(callId, 'CONFIRMED');
             } else {
-              // Unhold re-INVITE 200 OK — resume audio
+              // Unhold re-INVITE 200 OK, resume audio
               call.isOnHold = false;
               await _setupRtpFromSdp(message);
               onCallStateChanged?.call(callId, 'RESUMED');
@@ -286,7 +286,7 @@ class UdpSipClient {
         }
       }
     } else if (statusLine.contains(' 100 ')) {
-      // 100 Trying — ignore
+      // 100 Trying, ignore
     } else if (statusLine.contains(' 180 ')) {
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
@@ -294,13 +294,13 @@ class UdpSipClient {
       }
     } else if (statusLine.contains(' 403 ')) {
       if (cseqMethod == 'REGISTER') {
-        sipLog('[SIP] Registration FORBIDDEN — check credentials');
+        sipLog('[SIP] Registration FORBIDDEN, check credentials');
         _isRegistered = false;
         onRegistrationStateChanged?.call(false);
-        onError?.call('Registration forbidden — wrong credentials');
+        onError?.call('Registration forbidden, wrong credentials');
       }
     } else if (statusLine.contains(' 487 ')) {
-      // 487 Request Terminated — response to our CANCEL; ACK it
+      // 487 Request Terminated, response to our CANCEL; ACK it
       await _sendNon2xxAck(message);
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
@@ -309,7 +309,7 @@ class UdpSipClient {
       }
     } else if (statusLine.contains(' 486 ') ||
         statusLine.contains(' 603 ')) {
-      // Busy / Decline — ACK the final response
+      // Busy / Decline, ACK the final response
       await _sendNon2xxAck(message);
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
@@ -333,7 +333,7 @@ class UdpSipClient {
     } else if (statusLine.startsWith('NOTIFY')) {
       _sendSimpleResponse(message, 200, 'OK');
     } else if (statusLine.startsWith('ACK')) {
-      // ACK for our 200 OK to incoming INVITE — dialog established
+      // ACK for our 200 OK to incoming INVITE, dialog established
       final callId = _getHeaderValue(message, 'Call-ID')?.trim();
       if (callId != null) {
         onCallStateChanged?.call(callId, 'CONFIRMED');
@@ -367,7 +367,7 @@ class UdpSipClient {
       }
     }
 
-    // Generate a local tag for this dialog — MUST be consistent across 180 and 200
+    // Generate a local tag for this dialog, MUST be consistent across 180 and 200
     final localTag = _generateTag();
 
     // Store pending invite with its tag
@@ -634,7 +634,7 @@ class UdpSipClient {
     if (call == null) return;
 
     // Outgoing call still ringing → send CANCEL (not BYE)
-    // Don't remove from _activeCalls here — the 487 response handler will do it
+    // Don't remove from _activeCalls here, the 487 response handler will do it
     if (!call.isIncoming && !call.isConfirmed) {
       await _sendCancel(call);
       return;
@@ -655,7 +655,7 @@ class UdpSipClient {
     }
 
     try {
-      // Stop microphone — don't send audio to a held call
+      // Stop microphone, don't send audio to a held call
       onMicrophoneStop?.call();
 
       _holdPendingCallIds.add(callId);
@@ -1313,7 +1313,7 @@ class UdpSipClient {
   /// correct interface, then reads back the local address.  Falls back to a
   /// TCP connect (which always works) if the UDP socket reports 0.0.0.0.
   Future<String> _getLocalIp() async {
-    // 1. TCP connect — most reliable. The OS routes to the server and
+    // 1. TCP connect, most reliable. The OS routes to the server and
     //    Socket.address gives us the local IP of that connection.
     try {
       final tcp = await Socket.connect(
@@ -1330,12 +1330,12 @@ class UdpSipClient {
       sipLog('[SIP] TCP IP detection failed: $e');
     }
 
-    // 2. UDP connected socket — bind, connect (no send needed),
+    // 2. UDP connected socket, bind, connect (no send needed),
     //    then read the local address the OS assigned.
     try {
       final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
       udp.send([0], InternetAddress(_server), _port);
-      // The bind address won't help — we need to check interfaces
+      // The bind address won't help, we need to check interfaces
       // that share a subnet with the server instead.
       udp.close();
     } catch (_) {}

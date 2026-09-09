@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-/// PCMA (G.711 A-law) decoder — ITU-T G.711 standard
+/// PCMA (G.711 A-law) decoder, ITU-T G.711 standard
 /// Converts A-law compressed audio to 16-bit linear PCM
 class PcmaDecoder {
   static final Int16List _alawTable = _generateAlawTable();

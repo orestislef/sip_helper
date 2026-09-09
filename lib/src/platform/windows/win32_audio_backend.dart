@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import '../audio_platform.dart';
 import 'win32_audio.dart';
 
-/// WinMM WAVE_MAPPER constant — "use the system default device".
+/// WinMM WAVE_MAPPER constant, "use the system default device".
 const int _waveMapper = 0xFFFFFFFF;
 
 int _resolveDeviceId(int deviceId) =>
