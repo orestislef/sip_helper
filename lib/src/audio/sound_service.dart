@@ -243,7 +243,7 @@ class SoundService {
     // Re-enumerate devices (Bluetooth may have switched A2DP→HFP)
     try {
       final devices = AudioPlatform.instance.devices.getOutputDevices();
-      sipLog('[SipSound] Voice start — re-enumerating output devices:');
+      sipLog('[SipSound] Voice start, re-enumerating output devices:');
       for (int i = 0; i < devices.length; i++) {
         sipLog('[SipSound]   [$i] ${devices[i]}');
       }

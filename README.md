@@ -214,7 +214,7 @@ sipLogger = print;
 
 - **Dart SDK** >= 3.0.0
 - **Windows 10/11** for built-in audio (WinMM). Other platforms: SIP/RTP works, bring your own audio backend.
-- **SIP Server** — Asterisk, FreeSWITCH, or any RFC 3261 compliant server
+- **SIP Server**: Asterisk, FreeSWITCH, or any RFC 3261 compliant server
 
 ## License
 

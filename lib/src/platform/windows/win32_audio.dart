@@ -193,7 +193,7 @@ Pointer<WAVEFORMATEX> _allocFormat({int sampleRate = 8000}) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// WinAudioPlayer — real-time PCM16 playback via waveOut
+// WinAudioPlayer, real-time PCM16 playback via waveOut
 // ════════════════════════════════════════════════════════════════════════
 
 class WinAudioPlayer {
@@ -430,7 +430,7 @@ class WinAudioPlayer {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// WinAudioRecorder — real-time PCM16 capture via waveIn
+// WinAudioRecorder, real-time PCM16 capture via waveIn
 // ════════════════════════════════════════════════════════════════════════
 
 class WinAudioRecorder {

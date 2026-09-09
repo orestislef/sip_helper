@@ -27,7 +27,7 @@ class StubAudioPlayer implements AudioPlayer {
 
   @override
   bool open() {
-    sipLog('[StubAudio] AudioPlayer.open() — not implemented on this platform');
+    sipLog('[StubAudio] AudioPlayer.open() is not implemented on this platform');
     return false;
   }
 
@@ -52,7 +52,7 @@ class StubAudioRecorder implements AudioRecorder {
   @override
   bool open() {
     sipLog(
-        '[StubAudio] AudioRecorder.open() — not implemented on this platform');
+        '[StubAudio] AudioRecorder.open() is not implemented on this platform');
     return false;
   }
 

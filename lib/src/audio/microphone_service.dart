@@ -58,7 +58,7 @@ class MicrophoneService {
     }
   }
 
-  /// Process captured PCM16 data — encode to PCMA and deliver via callbacks.
+  /// Process captured PCM16 data, encode to PCMA and deliver via callbacks.
   void _processAudioData(Uint8List pcm16Data) {
     if (!_isRecording) return;
 
