@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 /// Platform-neutral default device ID.
@@ -42,7 +43,9 @@ abstract class AudioRecorder {
   void Function(Uint8List pcm16Data)? onData;
 
   /// Open the audio input device and begin capture. Returns true on success.
-  bool open();
+  /// May complete asynchronously (mobile backends ask for the microphone
+  /// permission here).
+  FutureOr<bool> open();
 
   /// Stop capture and close the audio input device.
   void close();
@@ -55,6 +58,48 @@ abstract class AudioDevices {
 
   /// List available input (capture) device names. Index = device ID.
   List<String> getInputDevices();
+}
+
+/// Platform audio session: microphone permission, call audio mode and
+/// output routing. Desktop backends use [NoopAudioSession].
+abstract class AudioSession {
+  /// Whether the microphone permission is granted.
+  Future<bool> hasMicrophonePermission();
+
+  /// Ask for the microphone permission. Returns true when granted.
+  Future<bool> requestMicrophonePermission();
+
+  /// Switch the device into call mode (Android: communication mode, audio
+  /// focus and a foreground service; iOS: play-and-record voice chat
+  /// session). Called when a call is placed or answered.
+  Future<void> activate();
+
+  /// Leave call mode. Called when the last call ends.
+  Future<void> deactivate();
+
+  /// Route call audio to the loudspeaker (true) or the earpiece (false).
+  Future<void> setSpeakerphone(bool on);
+
+  /// Whether call audio goes to the loudspeaker.
+  bool get isSpeakerphoneOn;
+}
+
+/// [AudioSession] for platforms without a session concept (desktop).
+class NoopAudioSession implements AudioSession {
+  bool _speaker = false;
+
+  @override
+  Future<bool> hasMicrophonePermission() async => true;
+  @override
+  Future<bool> requestMicrophonePermission() async => true;
+  @override
+  Future<void> activate() async {}
+  @override
+  Future<void> deactivate() async {}
+  @override
+  Future<void> setSpeakerphone(bool on) async => _speaker = on;
+  @override
+  bool get isSpeakerphoneOn => _speaker;
 }
 
 /// Factory function type for creating an [AudioPlayer].

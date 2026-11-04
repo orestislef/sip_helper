@@ -1,3 +1,45 @@
+## 0.4.0
+
+The package is now a Flutter plugin with native call audio on Android and iOS, and the SIP layer was rebuilt from a call center app that runs on Asterisk all day.
+
+**Breaking**
+
+- Requires Flutter (the native audio needs a plugin). Dart 3.4 or newer.
+- `UdpSipClient` takes a `SipMediaHandler` instead of the `onRtp*` / `onMicrophone*` / `onAudioCleanup` callbacks, `onIncomingCall` now also passes the caller name, and `onCallStateChanged` passes a `SipCallEvent` instead of a string.
+- `AudioRecorder.open()` returns `FutureOr<bool>` (existing sync backends still compile). `AudioPlatform` has a new optional `session`.
+- `SipHelper.disconnect()` now hangs up live calls and un-registers before closing the socket.
+- Registration state is reported only when it changes, not on every refresh.
+
+**New**
+
+- Android backend: AudioRecord on the voice communication source with echo cancellation, noise suppression and AGC, AudioTrack playback, communication mode and audio focus, speaker, earpiece and Bluetooth routing, proximity screen off, foreground service during calls, runtime permission request.
+- iOS backend: AVAudioEngine with voice processing, play and record session during calls, speaker override, Bluetooth, proximity, interruption and route change recovery, permission request.
+- `SipHelper`: `callEventStream`, `calls`, `transferCall`, `sendDtmf`, `declineCall`, `setMuted`, `setSpeakerphone`, `requestMicrophonePermission`, `reconnect`, automatic ring and ringback tones, automatic hold of the other calls. `makeCall` returns the Call-ID, `holdCall` and `unholdCall` return whether the PBX accepted.
+- Blind transfer with REFER and NOTIFY.
+- DTMF as RFC 4733 telephone-event, SIP INFO fallback.
+- G.711 µ-law (PCMU) encoder and decoder, codec picked from the other side's offer.
+- Digest auth for every request (REGISTER, INVITE, re-INVITE, BYE, REFER), 407 Proxy-Authenticate, qop, opaque, SHA-256, stale nonces.
+- Clean un-REGISTER (`Expires: 0`) on disconnect, registration refresh based on the granted expiry, 423 Min-Expires, retry with backoff.
+- NAT keep-alives (`keepAliveInterval`), `authUsername`, `userAgent` in `SipConfiguration`. `registerInterval` is now used as the registration lifetime.
+- Several calls at once: shared RTP socket and microphone are owned by the live call, held calls' audio is filtered out.
+- Symmetric RTP latching when the PBX sends from a different address than its SDP.
+- Early media on 183 Session Progress.
+- Delayed offer (INVITE or re-INVITE without SDP), 488 for offers without G.711.
+
+**Fixed**
+
+- CSeq is tracked per dialog, and ACKs carry the CSeq of the INVITE they acknowledge.
+- The ACK for a 4xx to INVITE reuses the INVITE branch.
+- CANCEL waits for a provisional response, and a 200 OK that crosses a CANCEL is ACKed and hung up.
+- Lost UDP packets: requests are retransmitted, our 200 OK is repeated until the ACK arrives, retransmitted INVITEs no longer ring twice.
+- On Windows back-to-back UDP sends were silently dropped (100 Trying + 180 Ringing, ACK + BYE). Sends are now queued until the socket takes them.
+- G.711 A-law encoder had the sign bit inverted compared with the standard and the decoder.
+- Remote hold no longer stops the microphone of another call, a session refresh no longer fires hold events again, and our own hold is kept when the PBX re-offers.
+- Retransmitted hold 200 OK no longer restarts the microphone.
+- RTP timestamps advance by the real number of samples, payload type 0 is played as µ-law, DTMF and comfort noise packets are not played as audio.
+- Requests the client does not support get 501 instead of no answer, all Via headers are echoed, header names are case-insensitive and compact forms are understood.
+- Upsampling to 16 kHz uses linear interpolation instead of sample doubling.
+
 ## 0.3.0
 
 - **Breaking:** cross-platform audio abstraction. `WinAudioPlayer`, `WinAudioRecorder`, `WinAudioDevices` are no longer exported from the barrel file. Use `AudioPlatform.instance.createPlayer()`, `AudioPlatform.instance.createRecorder()`, and `AudioPlatform.instance.devices` instead.

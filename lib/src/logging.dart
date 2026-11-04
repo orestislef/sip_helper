@@ -5,6 +5,11 @@ typedef SipLogCallback = void Function(String message);
 /// Example: `sipLogger = print;`
 SipLogCallback? sipLogger;
 
+/// When true, every SIP message sent and received is logged in full
+/// (Authorization headers are masked). Off by default, only the first line
+/// of each message is logged.
+bool sipLogFullMessages = false;
+
 /// Internal logging function used throughout the package.
 void sipLog(String message) {
   sipLogger?.call(message);

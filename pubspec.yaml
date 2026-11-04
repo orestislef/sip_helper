@@ -1,8 +1,9 @@
 name: sip_helper
 description: >-
-  A lightweight SIP/VoIP library for Dart. SIP protocol (UDP),
-  RTP audio transport, G.711 A-law codec, and platform-native audio I/O.
-version: 0.3.0
+  SIP/VoIP for Flutter. SIP over UDP, RTP, G.711 A-law and u-law, hold and
+  resume, blind transfer and DTMF, with native call audio on Android, iOS and
+  Windows.
+version: 0.4.0
 homepage: https://orestislef.gr/
 repository: https://github.com/orestislef/sip_helper
 issue_tracker: https://github.com/orestislef/sip_helper/issues
@@ -14,12 +15,27 @@ topics:
   - telephony
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.4.0
+  flutter: ">=3.22.0"
 
 dependencies:
+  flutter:
+    sdk: flutter
   ffi: ^2.2.0
   crypto: ^3.0.7
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   lints: ^6.1.0
-  test: ^1.32.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: gr.orestislef.sip_helper
+        pluginClass: SipHelperPlugin
+      ios:
+        pluginClass: SipHelperPlugin
+      windows:
+        dartPluginClass: SipHelperWindows

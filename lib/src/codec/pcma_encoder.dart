@@ -11,8 +11,14 @@ class PcmaEncoder {
     for (int i = 0; i < 65536; i++) {
       int pcm = i < 32768 ? i : i - 65536;
 
-      int sign = (pcm < 0) ? 0x80 : 0x00;
-      if (pcm < 0) pcm = -pcm;
+      // G.711 A-law: the sign bit is SET for positive samples.
+      int sign;
+      if (pcm >= 0) {
+        sign = 0x80;
+      } else {
+        sign = 0x00;
+        pcm = -pcm - 1;
+      }
 
       int exponent = 7;
       int expMask = 0x4000;

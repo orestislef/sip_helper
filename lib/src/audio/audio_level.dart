@@ -18,6 +18,11 @@ class AudioLevelService {
     _inputLevel = _computeLevelPcm16(pcm16Data);
   }
 
+  /// Feed decoded PCM16 speaker data to compute output level.
+  void updateOutputFromPcm16(Uint8List pcm16Data) {
+    _outputLevel = _computeLevelPcm16(pcm16Data);
+  }
+
   /// Feed raw PCMA (G.711 A-law) RTP payload to compute output level.
   void updateOutputFromPcma(Uint8List pcmaData) {
     // Decode PCMA to PCM16 first, then compute level

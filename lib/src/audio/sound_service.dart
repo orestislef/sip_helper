@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
 import 'dart:typed_data';
 import '../logging.dart';
@@ -53,8 +54,20 @@ class SoundService {
   final List<Uint8List> _voiceAccum = [];
   int _voiceAccumBytes = 0;
 
-  // Output gain (1.0 = normal, up to 10.0 = 1000%)
-  double _outputGain = 5.0;
+  // Output gain (1.0 = normal). WinMM output is quiet, so Windows starts
+  // higher; mobile platforms already apply call volume themselves.
+  double _outputGain = _defaultOutputGain();
+  static double _defaultOutputGain() {
+    try {
+      return Platform.isWindows ? 5.0 : 1.0;
+    } catch (_) {
+      return 1.0;
+    }
+  }
+
+  /// Play a short beep when voice playback starts. Useful to check the
+  /// output device, off by default.
+  bool voiceStartBeep = false;
   double get outputGain => _outputGain;
   void setOutputGain(double gain) {
     _outputGain = gain.clamp(0.0, 20.0);
@@ -174,8 +187,8 @@ class SoundService {
       _voiceAccumBytes = 0;
       _voicePlaying = true;
       _voiceWriteCount = 0;
-      _player?.write(_voiceStartTone);
-      sipLog('[SipSound] Ring→Voice, device=$_outputDeviceId');
+      if (voiceStartBeep) _player?.write(_voiceStartTone);
+      sipLog('[SipSound] Ring to voice, device=$_outputDeviceId');
     } else {
       _player?.reset();
     }
@@ -207,8 +220,8 @@ class SoundService {
       _voiceAccumBytes = 0;
       _voicePlaying = true;
       _voiceWriteCount = 0;
-      _player?.write(_voiceStartTone);
-      sipLog('[SipSound] Ringback→Voice, device=$_outputDeviceId');
+      if (voiceStartBeep) _player?.write(_voiceStartTone);
+      sipLog('[SipSound] Ringback to voice, device=$_outputDeviceId');
     } else {
       _player?.reset();
     }
@@ -259,8 +272,7 @@ class SoundService {
     _voiceAccumBytes = 0;
     _voicePlaying = true;
     _voiceWriteCount = 0;
-    // Play a short diagnostic beep to confirm player works
-    _player?.write(_voiceStartTone);
+    if (voiceStartBeep) _player?.write(_voiceStartTone);
     sipLog('[SipSound] Voice started, device=$_outputDeviceId, freeBufs=${_player?.freeBufferCount ?? 0}/$_numBufs');
   }
 

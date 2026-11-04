@@ -23,6 +23,13 @@ class CallInfo {
   final String? callId;
   final CallDirection direction;
 
+  /// True while the far end has put this call on hold.
+  bool isRemoteHold = false;
+
+  /// True once the call was answered (stays true after it ends, so call
+  /// history can tell answered calls from missed ones).
+  bool wasAnswered = false;
+
   /// Optional callback invoked whenever the call state changes.
   void Function(CallInfo)? onStateChanged;
 
@@ -79,7 +86,11 @@ class CallInfo {
   }
 
   void endCall() => setState(CallState.ended);
-  void answer() => setState(CallState.active);
+  void answer() {
+    wasAnswered = true;
+    setState(CallState.active);
+  }
+
   void hold() => setState(CallState.onHold);
   void resume() => setState(CallState.active);
 }

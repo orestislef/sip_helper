@@ -1,13 +1,30 @@
-/// SIP configuration model
+/// SIP account configuration.
 class SipConfiguration {
   final String server;
   final String username;
   final String password;
   final String displayName;
   final int port;
-  final String transport; // UDP, TCP, TLS
+
+  /// Only UDP is supported.
+  final String transport;
   final bool autoRegister;
-  final int registerInterval; // seconds
+
+  /// Registration lifetime in seconds, sent as `Expires`. The registration
+  /// is refreshed automatically before it runs out.
+  final int registerInterval;
+
+  /// Username for digest authentication when it differs from the extension
+  /// (common with SIP providers). Empty means [username].
+  final String authUsername;
+
+  /// Value of the User-Agent header.
+  final String userAgent;
+
+  /// Seconds between NAT keep-alives sent to the server while registered.
+  /// Mobile networks drop idle UDP mappings after 30 to 60 seconds, after
+  /// which incoming calls no longer arrive. 0 disables keep-alives.
+  final int keepAliveInterval;
 
   const SipConfiguration({
     required this.server,
@@ -18,6 +35,9 @@ class SipConfiguration {
     this.transport = 'UDP',
     this.autoRegister = true,
     this.registerInterval = 600,
+    this.authUsername = '',
+    this.userAgent = 'IQ-SIP',
+    this.keepAliveInterval = 25,
   });
 
   /// Create from JSON
@@ -31,6 +51,9 @@ class SipConfiguration {
       transport: json['transport'] as String? ?? 'UDP',
       autoRegister: json['autoRegister'] as bool? ?? true,
       registerInterval: json['registerInterval'] as int? ?? 600,
+      authUsername: json['authUsername'] as String? ?? '',
+      userAgent: json['userAgent'] as String? ?? 'IQ-SIP',
+      keepAliveInterval: json['keepAliveInterval'] as int? ?? 25,
     );
   }
 
@@ -45,6 +68,9 @@ class SipConfiguration {
       'transport': transport,
       'autoRegister': autoRegister,
       'registerInterval': registerInterval,
+      'authUsername': authUsername,
+      'userAgent': userAgent,
+      'keepAliveInterval': keepAliveInterval,
     };
   }
 
@@ -58,6 +84,9 @@ class SipConfiguration {
     String? transport,
     bool? autoRegister,
     int? registerInterval,
+    String? authUsername,
+    String? userAgent,
+    int? keepAliveInterval,
   }) {
     return SipConfiguration(
       server: server ?? this.server,
@@ -68,6 +97,9 @@ class SipConfiguration {
       transport: transport ?? this.transport,
       autoRegister: autoRegister ?? this.autoRegister,
       registerInterval: registerInterval ?? this.registerInterval,
+      authUsername: authUsername ?? this.authUsername,
+      userAgent: userAgent ?? this.userAgent,
+      keepAliveInterval: keepAliveInterval ?? this.keepAliveInterval,
     );
   }
 

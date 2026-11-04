@@ -1,13 +1,16 @@
 import 'dart:typed_data';
-import '../logging.dart';
+
 import '../codec/pcma_decoder.dart';
+import '../codec/pcmu_decoder.dart';
+import '../logging.dart';
 import '../platform/audio_platform.dart';
+import 'audio_level.dart';
 import 'sound_service.dart';
 
-/// Real-time audio playback service for VoIP calls.
+/// Real-time playback of the remote voice.
 ///
-/// Routes decoded voice audio through SoundService's voice player,
-/// which uses the same WinAudioPlayer pattern proven to work for DTMF/ringback.
+/// Decodes G.711 (A-law or µ-law), upsamples 8 kHz to 16 kHz and plays it
+/// through [SoundService]'s shared player.
 class AudioPlayerService {
   static final AudioPlayerService instance = AudioPlayerService._internal();
   AudioPlayerService._internal();
@@ -16,76 +19,86 @@ class AudioPlayerService {
   int _outputDeviceId = defaultAudioDeviceId;
   int _packetCount = 0;
   int _dropCount = 0;
+  int _lastSample = 0;
 
   void setOutputDevice(int deviceId) {
     if (_outputDeviceId == deviceId) return;
     _outputDeviceId = deviceId;
-    sipLog('[AudioPlayer] Output device set to $deviceId');
+    SoundService.instance.setOutputDevice(deviceId);
   }
 
   Future<void> initialize() async {
     if (_isReady) return;
     _packetCount = 0;
     _dropCount = 0;
+    _lastSample = 0;
     _isReady = true;
-    sipLog('[AudioPlayer] Ready (routing through SoundService voice player)');
   }
 
-  /// Decode PCMA payload, upsample 8k→16k, and play through SoundService.
-  void processAudioPacket(Uint8List pcmaPayload) {
+  /// Decode and play one RTP payload. [payloadType] 8 = PCMA, 0 = PCMU.
+  /// Anything else (telephone-event, comfort noise) is not voice and is
+  /// ignored instead of being played as noise.
+  void processAudioPacket(Uint8List payload, {int payloadType = 8}) {
     if (!_isReady) return;
+    final Uint8List pcm8k;
+    if (payloadType == 8) {
+      pcm8k = PcmaDecoder.decode(payload);
+    } else if (payloadType == 0) {
+      pcm8k = PcmuDecoder.decode(payload);
+    } else {
+      return;
+    }
 
-    // Start voice player on first packet
-    if (!SoundService.instance.isVoicePlaying) {
-      SoundService.instance.startVoicePlayback();
-      if (!SoundService.instance.isVoicePlaying) {
+    final sound = SoundService.instance;
+    if (!sound.isVoicePlaying) {
+      // Remote audio is here (answer or early media): local ringback stops.
+      sound.stopRingback();
+      sound.startVoicePlayback();
+      if (!sound.isVoicePlaying) {
         _dropCount++;
-        if (_dropCount <= 3) {
-          sipLog('[AudioPlayer] Voice player failed to start');
-        }
+        if (_dropCount <= 3) sipLog('[AudioPlayer] Voice player failed to start');
         return;
       }
     }
 
     _packetCount++;
-
-    // Decode PCMA → PCM16 at 8kHz
-    final pcm8k = PcmaDecoder.decode(pcmaPayload);
-
-    // Upsample 8kHz → 16kHz (duplicate each sample)
-    final pcm16k = _upsample2x(pcm8k);
-
-    SoundService.instance.writeVoiceAudio(pcm16k);
+    AudioLevelService.instance.updateOutputFromPcm16(pcm8k);
+    sound.writeVoiceAudio(_upsample2x(pcm8k));
 
     if (_packetCount <= 3 || _packetCount % 500 == 0) {
-      sipLog(
-          '[AudioPlayer] Packet #$_packetCount, ${pcmaPayload.length} PCMA → ${pcm16k.length} PCM16@16k via SoundService');
+      sipLog('[AudioPlayer] Packet #$_packetCount, ${payload.length} bytes '
+          '(PT $payloadType)');
     }
   }
 
-  /// Simple 2x upsample: duplicate each 16-bit sample.
-  static Uint8List _upsample2x(Uint8List pcm8k) {
-    final len = pcm8k.length;
-    final pcm16k = Uint8List(len * 2);
-    for (int i = 0; i < len; i += 2) {
-      final lo = pcm8k[i];
-      final hi = pcm8k[i + 1];
-      final j = i * 2;
-      pcm16k[j] = lo;
-      pcm16k[j + 1] = hi;
-      pcm16k[j + 2] = lo;
-      pcm16k[j + 3] = hi;
+  /// 8 kHz to 16 kHz with linear interpolation. Plain sample doubling
+  /// leaves an image of the voice band above 4 kHz that sounds metallic.
+  Uint8List _upsample2x(Uint8List pcm8k) {
+    final n = pcm8k.length ~/ 2;
+    final src = ByteData.sublistView(pcm8k);
+    final out = Uint8List(n * 4);
+    final dst = ByteData.sublistView(out);
+    var prev = _lastSample;
+    for (var i = 0; i < n; i++) {
+      final s = src.getInt16(i * 2, Endian.little);
+      dst.setInt16(i * 4, (prev + s) ~/ 2, Endian.little);
+      dst.setInt16(i * 4 + 2, s, Endian.little);
+      prev = s;
     }
-    return pcm16k;
+    _lastSample = prev;
+    return out;
   }
 
   void stop() {
-    sipLog(
-        '[AudioPlayer] Stopping. Processed $_packetCount packets, $_dropCount drops');
+    if (_isReady) {
+      sipLog('[AudioPlayer] Stopping. Played $_packetCount packets, '
+          '$_dropCount drops');
+    }
     SoundService.instance.stopVoicePlayback();
     _isReady = false;
     _packetCount = 0;
     _dropCount = 0;
+    _lastSample = 0;
   }
 
   void clear() {}

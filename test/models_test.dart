@@ -1,4 +1,4 @@
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:sip_helper/src/models/sip_configuration.dart';
 import 'package:sip_helper/src/models/call_info.dart';
 
