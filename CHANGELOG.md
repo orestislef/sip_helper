@@ -1,3 +1,7 @@
+## 0.4.1
+
+- New `allowContactRewrite` option (in `SipConfiguration` and `UdpSipClient`), off by default. Behind NAT the client takes the public address the server reports in the REGISTER response (Via `received` and `rport`), uses it in Contact, Via and SDP and registers again with it. Same as "Allow IP rewrite" in MicroSIP. Needed when the server does not rewrite contacts itself, otherwise incoming calls do not arrive.
+
 ## 0.4.0
 
 The package is now a Flutter plugin with native call audio on Android and iOS, and the SIP layer was rebuilt from a call center app that runs on Asterisk all day.

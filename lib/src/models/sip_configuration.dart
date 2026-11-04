@@ -26,6 +26,12 @@ class SipConfiguration {
   /// which incoming calls no longer arrive. 0 disables keep-alives.
   final int keepAliveInterval;
 
+  /// Put the public address the server reports (Via `received`/`rport`)
+  /// in Contact, Via and SDP and register again with it. Same as "Allow IP
+  /// rewrite" in MicroSIP. Turn it on behind NAT when the server does not
+  /// rewrite contacts itself.
+  final bool allowContactRewrite;
+
   const SipConfiguration({
     required this.server,
     required this.username,
@@ -38,6 +44,7 @@ class SipConfiguration {
     this.authUsername = '',
     this.userAgent = 'IQ-SIP',
     this.keepAliveInterval = 25,
+    this.allowContactRewrite = false,
   });
 
   /// Create from JSON
@@ -54,6 +61,7 @@ class SipConfiguration {
       authUsername: json['authUsername'] as String? ?? '',
       userAgent: json['userAgent'] as String? ?? 'IQ-SIP',
       keepAliveInterval: json['keepAliveInterval'] as int? ?? 25,
+      allowContactRewrite: json['allowContactRewrite'] as bool? ?? false,
     );
   }
 
@@ -71,6 +79,7 @@ class SipConfiguration {
       'authUsername': authUsername,
       'userAgent': userAgent,
       'keepAliveInterval': keepAliveInterval,
+      'allowContactRewrite': allowContactRewrite,
     };
   }
 
@@ -87,6 +96,7 @@ class SipConfiguration {
     String? authUsername,
     String? userAgent,
     int? keepAliveInterval,
+    bool? allowContactRewrite,
   }) {
     return SipConfiguration(
       server: server ?? this.server,
@@ -100,6 +110,7 @@ class SipConfiguration {
       authUsername: authUsername ?? this.authUsername,
       userAgent: userAgent ?? this.userAgent,
       keepAliveInterval: keepAliveInterval ?? this.keepAliveInterval,
+      allowContactRewrite: allowContactRewrite ?? this.allowContactRewrite,
     );
   }
 

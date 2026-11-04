@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'sip_helper'
-  s.version          = '0.4.0'
+  s.version          = '0.4.1'
   s.summary          = 'SIP/VoIP for Flutter with native call audio.'
   s.description      = <<-DESC
 SIP over UDP, RTP and G.711 with native call audio (AVAudioEngine with voice

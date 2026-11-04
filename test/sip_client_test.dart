@@ -31,7 +31,8 @@ void main() {
   late List<bool> registrations;
   late List<String> incoming;
 
-  UdpSipClient makeClient({String password = 'secret'}) {
+  UdpSipClient makeClient(
+      {String password = 'secret', bool allowContactRewrite = false}) {
     final c = UdpSipClient(
       server: '127.0.0.1',
       port: pbx.port,
@@ -41,6 +42,7 @@ void main() {
       media: media,
       localIp: '127.0.0.1',
       keepAliveInterval: Duration.zero,
+      allowContactRewrite: allowContactRewrite,
     );
     c.onCallStateChanged = (id, e) => events.add('$id:${e.name}');
     c.onError = errors.add;
@@ -631,6 +633,70 @@ void main() {
       expect(media.releases, releases);
       expect(media.micStops, stops);
       expect(client.activeCalls.keys, [second]);
+    });
+  });
+
+  group('contact rewrite', () {
+    // What a server behind the NAT reports: our public address in the Via.
+    String natted(String response) => response.replaceFirst(
+        ';rport;', ';rport=40123;received=203.0.113.5;');
+
+    Future<SipMessage> registerBehindNat() async {
+      await client.connect();
+      final r1 = await pbx.request('REGISTER');
+      pbx.send(natted(pbx.respond(r1, 401, 'Unauthorized', headers: [
+        'WWW-Authenticate: Digest realm="asterisk", nonce="nat1", qop="auth"',
+      ])));
+      final r2 = await pbx.request('REGISTER');
+      pbx.send(natted(pbx.respond(r2, 200, 'OK', toTag: 'reg', headers: [
+        'Contact: <sip:1001@127.0.0.1:${pbx.clientPort}>;expires=600',
+      ])));
+      await eventually(() => client.isRegistered);
+      return r2;
+    }
+
+    test('off by default: the public address is only reported', () async {
+      final r2 = await registerBehindNat();
+      expect(client.publicAddress, '203.0.113.5:40123');
+      await pbx.expectNothing(
+          (m) => m.method == 'REGISTER' && m.cseqNumber! > r2.cseqNumber!);
+      expect(r2.header('Contact'), '<sip:1001@127.0.0.1:${pbx.clientPort}>');
+    });
+
+    test('on: registers again with the public address and uses it in calls',
+        () async {
+      client = makeClient(allowContactRewrite: true);
+      final r2 = await registerBehindNat();
+
+      final r3 = await pbx.request('REGISTER');
+      expect(r3.cseqNumber, r2.cseqNumber! + 1);
+      expect(r3.callId, r2.callId);
+      expect(r3.header('Contact'), '<sip:1001@203.0.113.5:40123>');
+      expect(r3.topVia, startsWith('SIP/2.0/UDP 203.0.113.5:40123;rport'));
+      final auth = _params(r3.header('Authorization')!);
+      expect(auth['nonce'], 'nat1');
+      expect(auth['nc'], '00000002');
+
+      pbx.send(natted(pbx.respond(r3, 200, 'OK', toTag: 'reg', headers: [
+        'Contact: <sip:1001@203.0.113.5:40123>;expires=600',
+      ])));
+      await pbx.expectNothing(
+          (m) => m.method == 'REGISTER' && m.cseqNumber! > r3.cseqNumber!);
+      expect(registrations, [true]);
+
+      await client.makeCall('2000');
+      final invite = await pbx.request('INVITE');
+      expect(invite.header('Contact'), '<sip:1001@203.0.113.5:40123>');
+      expect(invite.topVia, contains('203.0.113.5:40123'));
+      expect(invite.body, contains('c=IN IP4 203.0.113.5'));
+    });
+
+    test('on: no NAT, no second REGISTER', () async {
+      client = makeClient(allowContactRewrite: true);
+      await register();
+      final last = pbx.all.where((m) => m.method == 'REGISTER').last;
+      await pbx.expectNothing(
+          (m) => m.method == 'REGISTER' && m.cseqNumber! > last.cseqNumber!);
     });
   });
 

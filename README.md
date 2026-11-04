@@ -30,7 +30,7 @@ The call handling comes from a call center app that runs on Asterisk all day.
 
 ```yaml
 dependencies:
-  sip_helper: ^0.4.0
+  sip_helper: ^0.4.1
 ```
 
 ### Android
@@ -136,6 +136,7 @@ SipConfiguration(
   displayName: '',
   registerInterval: 600,     // registration lifetime in seconds
   keepAliveInterval: 25,     // NAT keep-alive in seconds, 0 to turn off
+  allowContactRewrite: false, // use the public address the server reports
   userAgent: 'IQ-SIP',
 )
 ```
@@ -158,6 +159,8 @@ The client sends `rport`, keeps the NAT binding open and follows the RTP source 
 - PJSIP: `rtp_symmetric=yes`, `force_rport=yes`, `rewrite_contact=yes`, `direct_media=no`
 
 Allow `ulaw` and/or `alaw` on the endpoint.
+
+When the server cannot be set up that way, turn on `allowContactRewrite`. The client then takes the public address the server reports in the REGISTER response (`received` and `rport`), puts it in Contact, Via and SDP and registers again with it, like "Allow IP rewrite" in MicroSIP.
 
 ## Limits
 

@@ -143,6 +143,7 @@ class SipHelper {
         expires: config.registerInterval,
         userAgent: config.userAgent,
         keepAliveInterval: Duration(seconds: config.keepAliveInterval),
+        allowContactRewrite: config.allowContactRewrite,
       );
       client.onRegistrationStateChanged = (registered) {
         _isConnected = registered;

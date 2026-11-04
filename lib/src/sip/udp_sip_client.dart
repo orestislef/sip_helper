@@ -145,6 +145,13 @@ class UdpSipClient {
   /// binding open, so incoming calls keep reaching us. Zero disables it.
   final Duration keepAliveInterval;
 
+  /// Use the address the server sees us at (`received` and `rport` on the
+  /// Via of the REGISTER response) in Contact, Via and SDP, and register
+  /// again with it. Same as "Allow IP rewrite" in MicroSIP (pjsua
+  /// `allow_contact_rewrite`). Needed behind NAT when the server does not
+  /// fix contacts itself, otherwise incoming calls never arrive.
+  final bool allowContactRewrite;
+
   /// The audio side. When null, calls are signalled without audio (tests).
   SipMediaHandler? media;
 
@@ -166,6 +173,13 @@ class UdpSipClient {
   Timer? _retryTimer;
   int _retryAttempt = 0;
   String? _publicAddress;
+  String? _publicHost;
+  int? _publicPort;
+
+  /// Address used in Contact, Via and SDP after a rewrite (null: local).
+  String? _contactHost;
+  int? _contactPort;
+  int _rewritesInARow = 0;
 
   bool _unregistering = false;
   Completer<void>? _unregisterCompleter;
@@ -244,6 +258,7 @@ class UdpSipClient {
     this.keepAliveInterval = const Duration(seconds: 25),
     int localPort = 0,
     String? localIp,
+    this.allowContactRewrite = false,
   })  : _server = server,
         _port = port,
         _username = username,
@@ -293,6 +308,12 @@ class UdpSipClient {
       _unregisterCompleter = null;
       _isRegistered = false;
       _retryAttempt = 0;
+      _publicAddress = null;
+      _publicHost = null;
+      _publicPort = null;
+      _contactHost = null;
+      _contactPort = null;
+      _rewritesInARow = 0;
 
       _socket!.listen(
         _onSocketEvent,
@@ -331,7 +352,10 @@ class UdpSipClient {
   String get _registrar =>
       _port == 5060 ? 'sip:$_server' : 'sip:$_server:$_port';
   String get _aor => 'sip:$_username@$_server';
-  String get _contact => '<sip:$_username@$_localIp:$_localPort>';
+  /// Host and port we advertise: the public ones after a contact rewrite.
+  String get _sentByHost => _contactHost ?? _localIp ?? '0.0.0.0';
+  int? get _sentByPort => _contactPort ?? _localPort;
+  String get _contact => '<sip:$_username@$_sentByHost:$_sentByPort>';
   String get _localIdentity => '${quoteDisplayName(_displayName)} <$_aor>';
 
   void _register({bool withAuth = false}) {
@@ -398,8 +422,9 @@ class UdpSipClient {
       sipLog('[SIP] Registered as $_username@$_server (expires $granted s)');
       _retryAttempt = 0;
       _setRegistered(true);
-      _scheduleRefresh(granted);
       _startKeepAlive();
+      if (_rewriteContactIfNeeded()) return;
+      _scheduleRefresh(granted);
       return;
     }
 
@@ -433,7 +458,7 @@ class UdpSipClient {
   }
 
   int _grantedExpires(SipMessage res) {
-    final mine = '$_localIp:$_localPort';
+    final mine = '$_sentByHost:$_sentByPort';
     for (final c in res.headerValues('Contact')) {
       if (c.contains(mine)) {
         final e = int.tryParse(headerParam(c, 'expires') ?? '');
@@ -449,13 +474,41 @@ class UdpSipClient {
     final received = headerParam(via, 'received');
     final rport = headerParam(via, 'rport');
     if (received == null || received.isEmpty) return;
-    final addr = '$received:${(rport == null || rport.isEmpty) ? _localPort : rport}';
+    final port = int.tryParse(rport ?? '') ?? _sentByPort;
+    final addr = '$received:$port';
+    _publicHost = received;
+    _publicPort = port;
     if (addr != _publicAddress) {
       _publicAddress = addr;
       if (received != _localIp) {
         sipLog('[SIP] Behind NAT, the server sees us as $addr');
       }
     }
+  }
+
+  /// With [allowContactRewrite], register again with the public address
+  /// when it differs from the one we advertise. Returns true when a new
+  /// REGISTER went out.
+  bool _rewriteContactIfNeeded() {
+    if (!allowContactRewrite) return false;
+    final host = _publicHost;
+    final port = _publicPort;
+    if (host == null || port == null) return false;
+    if (host == _sentByHost && port == _sentByPort) {
+      _rewritesInARow = 0;
+      return false;
+    }
+    // A server that reports a different address every time must not keep
+    // us re-registering in a loop.
+    if (_rewritesInARow >= 2) return false;
+    _rewritesInARow++;
+    sipLog('[SIP] Contact rewrite: $_sentByHost:$_sentByPort -> '
+        '$host:$port, registering again');
+    _contactHost = host;
+    _contactPort = port;
+    _regUsedCachedNonce = _regChallenge != null;
+    _register(withAuth: _regChallenge != null);
+    return true;
   }
 
   void _setRegistered(bool value) {
@@ -1608,7 +1661,7 @@ class UdpSipClient {
       bool bumpVersion = true}) {
     if (bumpVersion) call.sdpVersion++;
     return buildSdp(
-      localIp: _localIp ?? '0.0.0.0',
+      localIp: _sentByHost,
       rtpPort: media?.localPort ?? 0,
       sessionId: call.sdpSessionId,
       sessionVersion: call.sdpVersion,
@@ -1987,7 +2040,7 @@ class UdpSipClient {
   static void _blank(StringBuffer b) => b.write('\r\n');
 
   String _via(String branch) =>
-      'Via: SIP/2.0/UDP $_localIp:$_localPort;rport;branch=$branch';
+      'Via: SIP/2.0/UDP $_sentByHost:$_sentByPort;rport;branch=$branch';
 
   String _localDialogHeader(SipCall call) =>
       '${call.localHeader};tag=${call.localTag}';
