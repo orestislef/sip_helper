@@ -1,3 +1,10 @@
+## 0.4.2
+
+- Dart 3.7 and Flutter 3.29 or newer. `ffi` 2.2.0 already needed Dart 3.7, so 3.4 to 3.6 could not resolve the package anyway. Nothing else changes for apps.
+- `crypto` raised to ^3.0.8, the latest.
+- The example app moved from `package:flutter/material.dart`, deprecated in Flutter 3.47, to [material_ui](https://pub.dev/packages/material_ui). It now needs Flutter 3.47. The package itself uses no Material.
+- Code formatted with the Dart 3.7 style.
+
 ## 0.4.1
 
 - New `allowContactRewrite` option (in `SipConfiguration` and `UdpSipClient`), off by default. Behind NAT the client takes the public address the server reports in the REGISTER response (Via `received` and `rport`), uses it in Contact, Via and SDP and registers again with it. Same as "Allow IP rewrite" in MicroSIP. Needed when the server does not rewrite contacts itself, otherwise incoming calls do not arrive.

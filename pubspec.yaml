@@ -3,7 +3,7 @@ description: >-
   SIP/VoIP for Flutter. SIP over UDP, RTP, G.711 A-law and u-law, hold and
   resume, blind transfer and DTMF, with native call audio on Android, iOS and
   Windows.
-version: 0.4.1
+version: 0.4.2
 homepage: https://orestislef.gr/
 repository: https://github.com/orestislef/sip_helper
 issue_tracker: https://github.com/orestislef/sip_helper/issues
@@ -15,14 +15,14 @@ topics:
   - telephony
 
 environment:
-  sdk: ^3.4.0
-  flutter: ">=3.22.0"
+  sdk: ^3.7.0
+  flutter: ">=3.29.0"
 
 dependencies:
   flutter:
     sdk: flutter
   ffi: ^2.2.0
-  crypto: ^3.0.7
+  crypto: ^3.0.8
 
 dev_dependencies:
   flutter_test:

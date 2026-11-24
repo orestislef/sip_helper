@@ -30,7 +30,7 @@ The call handling comes from a call center app that runs on Asterisk all day.
 
 ```yaml
 dependencies:
-  sip_helper: ^0.4.1
+  sip_helper: ^0.4.2
 ```
 
 ### Android
