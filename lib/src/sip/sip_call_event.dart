@@ -43,17 +43,17 @@ enum SipCallEvent {
 
   /// The upper case name used by the legacy `callId:STATE` string stream.
   String get legacyName => switch (this) {
-        calling => 'CALLING',
-        ringing => 'RINGING',
-        confirmed => 'CONFIRMED',
-        held => 'HELD',
-        resumed => 'RESUMED',
-        remoteHeld => 'REMOTE_HELD',
-        remoteResumed => 'REMOTE_RESUMED',
-        transferred => 'TRANSFERRED',
-        ended => 'ENDED',
-        cancelled => 'CANCELED',
-        declined => 'DECLINED',
-        failed => 'FAILED',
-      };
+    calling => 'CALLING',
+    ringing => 'RINGING',
+    confirmed => 'CONFIRMED',
+    held => 'HELD',
+    resumed => 'RESUMED',
+    remoteHeld => 'REMOTE_HELD',
+    remoteResumed => 'REMOTE_RESUMED',
+    transferred => 'TRANSFERRED',
+    ended => 'ENDED',
+    cancelled => 'CANCELED',
+    declined => 'DECLINED',
+    failed => 'FAILED',
+  };
 }

@@ -84,14 +84,15 @@ class SipCall {
     String? remoteNumber,
     this.remoteName,
     int? sdpSessionId,
-  })  : remoteNumber = remoteNumber ?? '',
-        sdpSessionId =
-            sdpSessionId ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  }) : remoteNumber = remoteNumber ?? '',
+       sdpSessionId =
+           sdpSessionId ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
   /// `host:port` of the remote RTP endpoint, or null.
-  String? get remoteRtp => remoteRtpHost != null && remoteRtpPort != null
-      ? '$remoteRtpHost:$remoteRtpPort'
-      : null;
+  String? get remoteRtp =>
+      remoteRtpHost != null && remoteRtpPort != null
+          ? '$remoteRtpHost:$remoteRtpPort'
+          : null;
 
   /// Our own side of the dialog (From for outgoing, To for incoming).
   String get localHeader => isIncoming ? toHeader : fromHeader;

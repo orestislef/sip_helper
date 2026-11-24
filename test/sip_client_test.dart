@@ -31,8 +31,10 @@ void main() {
   late List<bool> registrations;
   late List<String> incoming;
 
-  UdpSipClient makeClient(
-      {String password = 'secret', bool allowContactRewrite = false}) {
+  UdpSipClient makeClient({
+    String password = 'secret',
+    bool allowContactRewrite = false,
+  }) {
     final c = UdpSipClient(
       server: '127.0.0.1',
       port: pbx.port,
@@ -53,7 +55,8 @@ void main() {
 
   setUp(() async {
     if (Platform.environment['SIP_DEBUG'] != null) {
-      sipLogger = (m) => print('${DateTime.now().toIso8601String().substring(17)} $m');
+      sipLogger =
+          (m) => print('${DateTime.now().toIso8601String().substring(17)} $m');
     }
     pbx = await FakePbx.start();
     media = FakeMedia();
@@ -73,10 +76,18 @@ void main() {
     await client.connect();
     final r1 = await pbx.request('REGISTER');
     expect(r1.header('Authorization'), isNull);
-    pbx.send(pbx.respond(r1, 401, 'Unauthorized', toTag: 'reg', headers: [
-      'WWW-Authenticate: Digest algorithm=MD5, realm="asterisk", '
-          'nonce="abc123", qop="auth", opaque="op1"',
-    ]));
+    pbx.send(
+      pbx.respond(
+        r1,
+        401,
+        'Unauthorized',
+        toTag: 'reg',
+        headers: [
+          'WWW-Authenticate: Digest algorithm=MD5, realm="asterisk", '
+              'nonce="abc123", qop="auth", opaque="op1"',
+        ],
+      ),
+    );
     final r2 = await pbx.request('REGISTER');
     expect(r2.cseqNumber, r1.cseqNumber! + 1);
     expect(r2.callId, r1.callId);
@@ -87,11 +98,21 @@ void main() {
     expect(auth['opaque'], 'op1');
     final ha1 = _md5('1001:asterisk:secret');
     final ha2 = _md5('REGISTER:$uri');
-    expect(auth['response'],
-        _md5('$ha1:abc123:${auth['nc']}:${auth['cnonce']}:auth:$ha2'));
-    pbx.send(pbx.respond(r2, 200, 'OK', toTag: 'reg', headers: [
-      'Contact: <sip:1001@127.0.0.1:${pbx.clientPort}>;expires=600',
-    ]));
+    expect(
+      auth['response'],
+      _md5('$ha1:abc123:${auth['nc']}:${auth['cnonce']}:auth:$ha2'),
+    );
+    pbx.send(
+      pbx.respond(
+        r2,
+        200,
+        'OK',
+        toTag: 'reg',
+        headers: [
+          'Contact: <sip:1001@127.0.0.1:${pbx.clientPort}>;expires=600',
+        ],
+      ),
+    );
     await eventually(() => client.isRegistered);
     expect(registrations, [true]);
   }
@@ -109,8 +130,10 @@ void main() {
     test('REGISTER is retransmitted when the server stays silent', () async {
       await client.connect();
       final first = await pbx.request('REGISTER');
-      final again = await pbx.request('REGISTER',
-          timeout: const Duration(seconds: 2));
+      final again = await pbx.request(
+        'REGISTER',
+        timeout: const Duration(seconds: 2),
+      );
       expect(_branch(again), _branch(first));
       expect(again.cseqNumber, first.cseqNumber);
     });
@@ -119,23 +142,42 @@ void main() {
       client = makeClient(password: 'wrong');
       await client.connect();
       final r1 = await pbx.request('REGISTER');
-      pbx.send(pbx.respond(r1, 401, 'Unauthorized',
-          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="n1"']));
+      pbx.send(
+        pbx.respond(
+          r1,
+          401,
+          'Unauthorized',
+          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="n1"'],
+        ),
+      );
       final r2 = await pbx.request('REGISTER');
-      pbx.send(pbx.respond(r2, 401, 'Unauthorized',
-          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="n2"']));
+      pbx.send(
+        pbx.respond(
+          r2,
+          401,
+          'Unauthorized',
+          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="n2"'],
+        ),
+      );
       await eventually(() => errors.isNotEmpty);
       expect(errors.single, contains('authentication rejected'));
       expect(client.isRegistered, isFalse);
       await pbx.expectNothing(
-          (m) => m.method == 'REGISTER' && m.cseqNumber! > r2.cseqNumber!);
+        (m) => m.method == 'REGISTER' && m.cseqNumber! > r2.cseqNumber!,
+      );
     });
 
     test('423 Interval Too Brief raises Expires to Min-Expires', () async {
       await client.connect();
       final r1 = await pbx.request('REGISTER');
-      pbx.send(pbx.respond(r1, 423, 'Interval Too Brief',
-          headers: ['Min-Expires: 1800']));
+      pbx.send(
+        pbx.respond(
+          r1,
+          423,
+          'Interval Too Brief',
+          headers: ['Min-Expires: 1800'],
+        ),
+      );
       final r2 = await pbx.request('REGISTER');
       expect(r2.header('Expires'), '1800');
     });
@@ -156,13 +198,28 @@ void main() {
 
     test('answers OPTIONS and rejects unknown methods', () async {
       await register();
-      pbx.send(pbx.requestTo('OPTIONS',
-          callId: 'opt1', cseq: 1, from: '<sip:pbx@127.0.0.1>;tag=o', to: '<sip:1001@127.0.0.1>'));
+      pbx.send(
+        pbx.requestTo(
+          'OPTIONS',
+          callId: 'opt1',
+          cseq: 1,
+          from: '<sip:pbx@127.0.0.1>;tag=o',
+          to: '<sip:1001@127.0.0.1>',
+        ),
+      );
       final ok = await pbx.response(200, method: 'OPTIONS');
       expect(ok.header('Allow'), contains('INVITE'));
-      pbx.send(pbx.requestTo('MESSAGE',
-          callId: 'msg1', cseq: 1, from: '<sip:pbx@127.0.0.1>;tag=m', to: '<sip:1001@127.0.0.1>',
-          body: 'hi', contentType: 'text/plain'));
+      pbx.send(
+        pbx.requestTo(
+          'MESSAGE',
+          callId: 'msg1',
+          cseq: 1,
+          from: '<sip:pbx@127.0.0.1>;tag=m',
+          to: '<sip:1001@127.0.0.1>',
+          body: 'hi',
+          contentType: 'text/plain',
+        ),
+      );
       await pbx.response(501, method: 'MESSAGE');
     });
   });
@@ -173,29 +230,33 @@ void main() {
     late String localTag;
 
     Future<SipMessage> sendInvite({String? sdp, int cseq = 102}) async {
-      final invite = pbx.requestTo('INVITE',
-          callId: callId,
-          cseq: cseq,
-          from: remoteFrom,
-          to: '<sip:1001@127.0.0.1>',
-          branch: 'z9hG4bKinv$cseq',
-          headers: [
-            'Record-Route: <sip:127.0.0.1:${pbx.port};lr>',
-            'Via: SIP/2.0/UDP 10.9.9.9:5060;branch=z9hG4bKupstream',
-          ],
-          body: sdp);
+      final invite = pbx.requestTo(
+        'INVITE',
+        callId: callId,
+        cseq: cseq,
+        from: remoteFrom,
+        to: '<sip:1001@127.0.0.1>',
+        branch: 'z9hG4bKinv$cseq',
+        headers: [
+          'Record-Route: <sip:127.0.0.1:${pbx.port};lr>',
+          'Via: SIP/2.0/UDP 10.9.9.9:5060;branch=z9hG4bKupstream',
+        ],
+        body: sdp,
+      );
       pbx.send(invite);
       return SipMessage.parse(invite)!;
     }
 
     String inDialog(String method, int cseq, {String? body, String? branch}) =>
-        pbx.requestTo(method,
-            callId: callId,
-            cseq: cseq,
-            from: remoteFrom,
-            to: '<sip:1001@127.0.0.1>;tag=$localTag',
-            branch: branch,
-            body: body);
+        pbx.requestTo(
+          method,
+          callId: callId,
+          cseq: cseq,
+          from: remoteFrom,
+          to: '<sip:1001@127.0.0.1>;tag=$localTag',
+          branch: branch,
+          body: body,
+        );
 
     Future<void> answered({String? sdp}) async {
       await register();
@@ -211,50 +272,62 @@ void main() {
       pbx.clearInbox();
     }
 
-    test('rings once, answers with the offered codec, confirms on ACK',
-        () async {
-      await register();
-      await sendInvite(sdp: pbxSdp(payloads: '0 101'));
-      await pbx.response(100);
-      final ringing = await pbx.response(180);
-      localTag = extractTag(ringing.to!)!;
-      expect(ringing.headerAll('Via'), hasLength(2));
-      expect(ringing.header('Contact'), isNotNull);
-      await eventually(() => incoming.isNotEmpty);
-      expect(incoming.single, '2000|Alice Smith|$callId');
+    test(
+      'rings once, answers with the offered codec, confirms on ACK',
+      () async {
+        await register();
+        await sendInvite(sdp: pbxSdp(payloads: '0 101'));
+        await pbx.response(100);
+        final ringing = await pbx.response(180);
+        localTag = extractTag(ringing.to!)!;
+        expect(ringing.headerAll('Via'), hasLength(2));
+        expect(ringing.header('Contact'), isNotNull);
+        await eventually(() => incoming.isNotEmpty);
+        expect(incoming.single, '2000|Alice Smith|$callId');
 
-      // A retransmitted INVITE repeats 180 and does not ring twice.
-      await sendInvite(sdp: pbxSdp(payloads: '0 101'));
-      await pbx.response(180);
-      expect(incoming, hasLength(1));
+        // A retransmitted INVITE repeats 180 and does not ring twice.
+        await sendInvite(sdp: pbxSdp(payloads: '0 101'));
+        await pbx.response(180);
+        expect(incoming, hasLength(1));
 
-      await client.answerCall(callId);
-      final ok = await pbx.response(200, method: 'INVITE');
-      expect(extractTag(ok.to!), localTag);
-      expect(ok.header('Record-Route'), '<sip:127.0.0.1:${pbx.port};lr>');
-      expect(ok.body, contains('m=audio 40000 RTP/AVP 0 101'));
-      expect(ok.body, isNot(contains('PCMA')));
-      expect(media.remotes.last, '127.0.0.1:30000/0/101');
-      expect(media.micStarts, 1);
-      expect(media.silences, 1);
+        await client.answerCall(callId);
+        final ok = await pbx.response(200, method: 'INVITE');
+        expect(extractTag(ok.to!), localTag);
+        expect(ok.header('Record-Route'), '<sip:127.0.0.1:${pbx.port};lr>');
+        expect(ok.body, contains('m=audio 40000 RTP/AVP 0 101'));
+        expect(ok.body, isNot(contains('PCMA')));
+        expect(media.remotes.last, '127.0.0.1:30000/0/101');
+        expect(media.micStarts, 1);
+        expect(media.silences, 1);
 
-      // No ACK yet: the 200 OK is retransmitted.
-      await pbx.response(200,
-          method: 'INVITE', timeout: const Duration(seconds: 2));
+        // No ACK yet: the 200 OK is retransmitted.
+        await pbx.response(
+          200,
+          method: 'INVITE',
+          timeout: const Duration(seconds: 2),
+        );
 
-      pbx.send(inDialog('ACK', 102));
-      await eventually(() => events.contains('$callId:confirmed'));
-      pbx.clearInbox();
-      await pbx.expectNothing((m) => m.statusCode == 200,
-          within: const Duration(milliseconds: 1500));
-      expect(events.where((e) => e == '$callId:confirmed'), hasLength(1));
-    });
+        pbx.send(inDialog('ACK', 102));
+        await eventually(() => events.contains('$callId:confirmed'));
+        pbx.clearInbox();
+        await pbx.expectNothing(
+          (m) => m.statusCode == 200,
+          within: const Duration(milliseconds: 1500),
+        );
+        expect(events.where((e) => e == '$callId:confirmed'), hasLength(1));
+      },
+    );
 
     test('remote hold and resume', () async {
       await answered();
       final starts = media.micStarts;
-      pbx.send(inDialog('INVITE', 103,
-          body: pbxSdp(payloads: '0 101', direction: 'sendonly')));
+      pbx.send(
+        inDialog(
+          'INVITE',
+          103,
+          body: pbxSdp(payloads: '0 101', direction: 'sendonly'),
+        ),
+      );
       final ok = await pbx.response(200, method: 'INVITE');
       expect(ok.body, contains('a=recvonly'));
       pbx.send(inDialog('ACK', 103));
@@ -262,8 +335,13 @@ void main() {
       expect(media.micStops, greaterThan(0));
 
       // A session refresh with the same direction does not repeat the event.
-      pbx.send(inDialog('INVITE', 104,
-          body: pbxSdp(payloads: '0 101', direction: 'sendonly')));
+      pbx.send(
+        inDialog(
+          'INVITE',
+          104,
+          body: pbxSdp(payloads: '0 101', direction: 'sendonly'),
+        ),
+      );
       await pbx.response(200, method: 'INVITE');
       pbx.send(inDialog('ACK', 104));
 
@@ -288,8 +366,14 @@ void main() {
       expect(extractTag(inv1.to!), 'pbxtag');
       expect(inv1.body, contains('a=sendonly'));
 
-      pbx.send(pbx.respond(inv1, 401, 'Unauthorized',
-          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="h1"']));
+      pbx.send(
+        pbx.respond(
+          inv1,
+          401,
+          'Unauthorized',
+          headers: ['WWW-Authenticate: Digest realm="asterisk", nonce="h1"'],
+        ),
+      );
       final ack1 = await pbx.request('ACK');
       expect(ack1.cseqNumber, 2);
       expect(_branch(ack1), _branch(inv1));
@@ -302,8 +386,12 @@ void main() {
       final ha2 = _md5('INVITE:${inv2.requestUri}');
       expect(auth['response'], _md5('$ha1:h1:$ha2'));
 
-      final ok = pbx.respond(inv2, 200, 'OK',
-          body: pbxSdp(payloads: '0 101', direction: 'recvonly'));
+      final ok = pbx.respond(
+        inv2,
+        200,
+        'OK',
+        body: pbxSdp(payloads: '0 101', direction: 'recvonly'),
+      );
       pbx.send(ok);
       final ack2 = await pbx.request('ACK');
       expect(ack2.cseqNumber, 3);
@@ -321,7 +409,14 @@ void main() {
       final inv3 = await pbx.request('INVITE');
       expect(inv3.cseqNumber, 4);
       expect(inv3.body, contains('a=sendrecv'));
-      pbx.send(pbx.respond(inv3, 200, 'OK', body: pbxSdp(payloads: '0 101', port: 30002)));
+      pbx.send(
+        pbx.respond(
+          inv3,
+          200,
+          'OK',
+          body: pbxSdp(payloads: '0 101', port: 30002),
+        ),
+      );
       final ack3 = await pbx.request('ACK');
       expect(ack3.cseqNumber, 4);
       expect(await resume, isTrue);
@@ -382,12 +477,16 @@ void main() {
       await sendInvite(sdp: pbxSdp());
       final ringing = await pbx.response(180);
       localTag = extractTag(ringing.to!)!;
-      pbx.send(pbx.requestTo('CANCEL',
+      pbx.send(
+        pbx.requestTo(
+          'CANCEL',
           callId: callId,
           cseq: 102,
           from: remoteFrom,
           to: '<sip:1001@127.0.0.1>',
-          branch: 'z9hG4bKinv102'));
+          branch: 'z9hG4bKinv102',
+        ),
+      );
       await pbx.response(200, method: 'CANCEL');
       final terminated = await pbx.response(487, method: 'INVITE');
       expect(extractTag(terminated.to!), localTag);
@@ -410,19 +509,23 @@ void main() {
       expect(incoming, isEmpty);
     });
 
-    test('delayed offer: we offer in 200 OK, the answer comes in ACK',
-        () async {
-      await register();
-      await sendInvite();
-      final ringing = await pbx.response(180);
-      localTag = extractTag(ringing.to!)!;
-      await client.answerCall(callId);
-      final ok = await pbx.response(200, method: 'INVITE');
-      expect(ok.body, contains('m=audio 40000 RTP/AVP 8 0 101'));
-      pbx.send(inDialog('ACK', 102, body: pbxSdp(payloads: '0', port: 30500)));
-      await eventually(() => events.contains('$callId:confirmed'));
-      expect(media.remotes.last, '127.0.0.1:30500/0/-');
-    });
+    test(
+      'delayed offer: we offer in 200 OK, the answer comes in ACK',
+      () async {
+        await register();
+        await sendInvite();
+        final ringing = await pbx.response(180);
+        localTag = extractTag(ringing.to!)!;
+        await client.answerCall(callId);
+        final ok = await pbx.response(200, method: 'INVITE');
+        expect(ok.body, contains('m=audio 40000 RTP/AVP 8 0 101'));
+        pbx.send(
+          inDialog('ACK', 102, body: pbxSdp(payloads: '0', port: 30500)),
+        );
+        await eventually(() => events.contains('$callId:confirmed'));
+        expect(media.remotes.last, '127.0.0.1:30500/0/-');
+      },
+    );
   });
 
   group('outgoing call', () {
@@ -438,9 +541,16 @@ void main() {
     Future<void> established({String answerPayloads = '8 101'}) async {
       await dial();
       pbx.send(pbx.respond(invite, 180, 'Ringing', toTag: 'callee'));
-      pbx.send(pbx.respond(invite, 200, 'OK', toTag: 'callee', headers: [
-        'Contact: <sip:2001@127.0.0.1:${pbx.port}>',
-      ], body: pbxSdp(payloads: answerPayloads, port: 30010)));
+      pbx.send(
+        pbx.respond(
+          invite,
+          200,
+          'OK',
+          toTag: 'callee',
+          headers: ['Contact: <sip:2001@127.0.0.1:${pbx.port}>'],
+          body: pbxSdp(payloads: answerPayloads, port: 30010),
+        ),
+      );
       await pbx.request('ACK');
       await eventually(() => events.contains('$callId:confirmed'));
       pbx.clearInbox();
@@ -453,9 +563,15 @@ void main() {
       expect(invite.cseqNumber, 1);
       expect(invite.body, contains('m=audio 40000 RTP/AVP 8 0 101'));
 
-      pbx.send(pbx.respond(invite, 407, 'Proxy Authentication Required',
+      pbx.send(
+        pbx.respond(
+          invite,
+          407,
+          'Proxy Authentication Required',
           toTag: 'x',
-          headers: ['Proxy-Authenticate: Digest realm="asterisk", nonce="p1"']));
+          headers: ['Proxy-Authenticate: Digest realm="asterisk", nonce="p1"'],
+        ),
+      );
       final ack = await pbx.request('ACK');
       expect(_branch(ack), _branch(invite));
       expect(ack.cseqNumber, 1);
@@ -466,21 +582,36 @@ void main() {
       expect(invite2.callId, invite.callId);
       expect(extractTag(invite2.from!), extractTag(invite.from!));
       final auth = _params(invite2.header('Proxy-Authorization')!);
-      expect(auth['response'],
-          _md5('${_md5('1001:asterisk:secret')}:p1:${_md5('INVITE:sip:2001@127.0.0.1')}'));
+      expect(
+        auth['response'],
+        _md5(
+          '${_md5('1001:asterisk:secret')}:p1:${_md5('INVITE:sip:2001@127.0.0.1')}',
+        ),
+      );
 
       pbx.send(pbx.respond(invite2, 100, 'Trying'));
       pbx.send(pbx.respond(invite2, 180, 'Ringing', toTag: 'callee'));
       await eventually(() => events.contains('$callId:ringing'));
 
-      pbx.send(pbx.respond(invite2, 200, 'OK', toTag: 'callee', headers: [
-        'Contact: <sip:2001@127.0.0.1:${pbx.port}>',
-        'Record-Route: <sip:127.0.0.1:${pbx.port};lr>, <sip:10.0.0.9;lr>',
-      ], body: pbxSdp(payloads: '8 101', port: 30010)));
+      pbx.send(
+        pbx.respond(
+          invite2,
+          200,
+          'OK',
+          toTag: 'callee',
+          headers: [
+            'Contact: <sip:2001@127.0.0.1:${pbx.port}>',
+            'Record-Route: <sip:127.0.0.1:${pbx.port};lr>, <sip:10.0.0.9;lr>',
+          ],
+          body: pbxSdp(payloads: '8 101', port: 30010),
+        ),
+      );
       final ack2 = await pbx.request('ACK');
       expect(ack2.requestUri, 'sip:2001@127.0.0.1:${pbx.port}');
-      expect(ack2.headerAll('Route'),
-          ['<sip:10.0.0.9;lr>', '<sip:127.0.0.1:${pbx.port};lr>']);
+      expect(ack2.headerAll('Route'), [
+        '<sip:10.0.0.9;lr>',
+        '<sip:127.0.0.1:${pbx.port};lr>',
+      ]);
       expect(ack2.cseqNumber, 2);
       expect(extractTag(ack2.to!), 'callee');
       await eventually(() => events.contains('$callId:confirmed'));
@@ -518,8 +649,10 @@ void main() {
     test('CANCEL waits for the first provisional response', () async {
       await dial();
       await client.hangupCall(callId);
-      await pbx.expectNothing((m) => m.method == 'CANCEL',
-          within: const Duration(milliseconds: 300));
+      await pbx.expectNothing(
+        (m) => m.method == 'CANCEL',
+        within: const Duration(milliseconds: 300),
+      );
       pbx.send(pbx.respond(invite, 180, 'Ringing', toTag: 'callee'));
       await pbx.request('CANCEL');
     });
@@ -530,9 +663,16 @@ void main() {
       await eventually(() => events.contains('$callId:ringing'));
       await client.hangupCall(callId);
       await pbx.request('CANCEL');
-      pbx.send(pbx.respond(invite, 200, 'OK', toTag: 'callee',
+      pbx.send(
+        pbx.respond(
+          invite,
+          200,
+          'OK',
+          toTag: 'callee',
           headers: ['Contact: <sip:2001@127.0.0.1:${pbx.port}>'],
-          body: pbxSdp()));
+          body: pbxSdp(),
+        ),
+      );
       final ack = await pbx.request('ACK');
       expect(ack.cseqNumber, invite.cseqNumber);
       final bye = await pbx.request('BYE');
@@ -558,8 +698,15 @@ void main() {
 
     test('early media from 183 is played before the answer', () async {
       await dial();
-      pbx.send(pbx.respond(invite, 183, 'Session Progress',
-          toTag: 'callee', body: pbxSdp(payloads: '8', port: 30777)));
+      pbx.send(
+        pbx.respond(
+          invite,
+          183,
+          'Session Progress',
+          toTag: 'callee',
+          body: pbxSdp(payloads: '8', port: 30777),
+        ),
+      );
       await eventually(() => events.contains('$callId:ringing'));
       expect(media.remotes.last, '127.0.0.1:30777/8/-');
     });
@@ -574,14 +721,18 @@ void main() {
       pbx.send(pbx.respond(refer, 202, 'Accepted'));
       expect(await accepted, isTrue);
 
-      pbx.send(pbx.requestTo('NOTIFY',
+      pbx.send(
+        pbx.requestTo(
+          'NOTIFY',
           callId: invite.callId!,
           cseq: 1,
           from: '${invite.to!};tag=callee',
           to: invite.from!,
           headers: ['Event: refer', 'Subscription-State: terminated'],
           body: 'SIP/2.0 200 OK\r\n',
-          contentType: 'message/sipfrag'));
+          contentType: 'message/sipfrag',
+        ),
+      );
       await pbx.response(200, method: 'NOTIFY');
       final bye = await pbx.request('BYE');
       pbx.send(pbx.respond(bye, 200, 'OK'));
@@ -613,16 +764,29 @@ void main() {
       final first = callId;
       final hold = client.holdCall(first);
       final reinv = await pbx.request('INVITE');
-      pbx.send(pbx.respond(reinv, 200, 'OK',
-          body: pbxSdp(payloads: '8 101', port: 30010, direction: 'recvonly')));
+      pbx.send(
+        pbx.respond(
+          reinv,
+          200,
+          'OK',
+          body: pbxSdp(payloads: '8 101', port: 30010, direction: 'recvonly'),
+        ),
+      );
       await pbx.request('ACK');
       expect(await hold, isTrue);
 
       final second = await client.makeCall('2002');
       final inv2 = await pbx.request('INVITE');
-      pbx.send(pbx.respond(inv2, 200, 'OK', toTag: 'c2',
+      pbx.send(
+        pbx.respond(
+          inv2,
+          200,
+          'OK',
+          toTag: 'c2',
           headers: ['Contact: <sip:2002@127.0.0.1:${pbx.port}>'],
-          body: pbxSdp(payloads: '8 101', port: 30020)));
+          body: pbxSdp(payloads: '8 101', port: 30020),
+        ),
+      );
       await pbx.request('ACK');
       await eventually(() => events.contains('$second:confirmed'));
       expect(media.ignored, {'127.0.0.1:30010'});
@@ -638,19 +802,38 @@ void main() {
 
   group('contact rewrite', () {
     // What a server behind the NAT reports: our public address in the Via.
-    String natted(String response) => response.replaceFirst(
-        ';rport;', ';rport=40123;received=203.0.113.5;');
+    String natted(String response) =>
+        response.replaceFirst(';rport;', ';rport=40123;received=203.0.113.5;');
 
     Future<SipMessage> registerBehindNat() async {
       await client.connect();
       final r1 = await pbx.request('REGISTER');
-      pbx.send(natted(pbx.respond(r1, 401, 'Unauthorized', headers: [
-        'WWW-Authenticate: Digest realm="asterisk", nonce="nat1", qop="auth"',
-      ])));
+      pbx.send(
+        natted(
+          pbx.respond(
+            r1,
+            401,
+            'Unauthorized',
+            headers: [
+              'WWW-Authenticate: Digest realm="asterisk", nonce="nat1", qop="auth"',
+            ],
+          ),
+        ),
+      );
       final r2 = await pbx.request('REGISTER');
-      pbx.send(natted(pbx.respond(r2, 200, 'OK', toTag: 'reg', headers: [
-        'Contact: <sip:1001@127.0.0.1:${pbx.clientPort}>;expires=600',
-      ])));
+      pbx.send(
+        natted(
+          pbx.respond(
+            r2,
+            200,
+            'OK',
+            toTag: 'reg',
+            headers: [
+              'Contact: <sip:1001@127.0.0.1:${pbx.clientPort}>;expires=600',
+            ],
+          ),
+        ),
+      );
       await eventually(() => client.isRegistered);
       return r2;
     }
@@ -659,44 +842,57 @@ void main() {
       final r2 = await registerBehindNat();
       expect(client.publicAddress, '203.0.113.5:40123');
       await pbx.expectNothing(
-          (m) => m.method == 'REGISTER' && m.cseqNumber! > r2.cseqNumber!);
+        (m) => m.method == 'REGISTER' && m.cseqNumber! > r2.cseqNumber!,
+      );
       expect(r2.header('Contact'), '<sip:1001@127.0.0.1:${pbx.clientPort}>');
     });
 
-    test('on: registers again with the public address and uses it in calls',
-        () async {
-      client = makeClient(allowContactRewrite: true);
-      final r2 = await registerBehindNat();
+    test(
+      'on: registers again with the public address and uses it in calls',
+      () async {
+        client = makeClient(allowContactRewrite: true);
+        final r2 = await registerBehindNat();
 
-      final r3 = await pbx.request('REGISTER');
-      expect(r3.cseqNumber, r2.cseqNumber! + 1);
-      expect(r3.callId, r2.callId);
-      expect(r3.header('Contact'), '<sip:1001@203.0.113.5:40123>');
-      expect(r3.topVia, startsWith('SIP/2.0/UDP 203.0.113.5:40123;rport'));
-      final auth = _params(r3.header('Authorization')!);
-      expect(auth['nonce'], 'nat1');
-      expect(auth['nc'], '00000002');
+        final r3 = await pbx.request('REGISTER');
+        expect(r3.cseqNumber, r2.cseqNumber! + 1);
+        expect(r3.callId, r2.callId);
+        expect(r3.header('Contact'), '<sip:1001@203.0.113.5:40123>');
+        expect(r3.topVia, startsWith('SIP/2.0/UDP 203.0.113.5:40123;rport'));
+        final auth = _params(r3.header('Authorization')!);
+        expect(auth['nonce'], 'nat1');
+        expect(auth['nc'], '00000002');
 
-      pbx.send(natted(pbx.respond(r3, 200, 'OK', toTag: 'reg', headers: [
-        'Contact: <sip:1001@203.0.113.5:40123>;expires=600',
-      ])));
-      await pbx.expectNothing(
-          (m) => m.method == 'REGISTER' && m.cseqNumber! > r3.cseqNumber!);
-      expect(registrations, [true]);
+        pbx.send(
+          natted(
+            pbx.respond(
+              r3,
+              200,
+              'OK',
+              toTag: 'reg',
+              headers: ['Contact: <sip:1001@203.0.113.5:40123>;expires=600'],
+            ),
+          ),
+        );
+        await pbx.expectNothing(
+          (m) => m.method == 'REGISTER' && m.cseqNumber! > r3.cseqNumber!,
+        );
+        expect(registrations, [true]);
 
-      await client.makeCall('2000');
-      final invite = await pbx.request('INVITE');
-      expect(invite.header('Contact'), '<sip:1001@203.0.113.5:40123>');
-      expect(invite.topVia, contains('203.0.113.5:40123'));
-      expect(invite.body, contains('c=IN IP4 203.0.113.5'));
-    });
+        await client.makeCall('2000');
+        final invite = await pbx.request('INVITE');
+        expect(invite.header('Contact'), '<sip:1001@203.0.113.5:40123>');
+        expect(invite.topVia, contains('203.0.113.5:40123'));
+        expect(invite.body, contains('c=IN IP4 203.0.113.5'));
+      },
+    );
 
     test('on: no NAT, no second REGISTER', () async {
       client = makeClient(allowContactRewrite: true);
       await register();
       final last = pbx.all.where((m) => m.method == 'REGISTER').last;
       await pbx.expectNothing(
-          (m) => m.method == 'REGISTER' && m.cseqNumber! > last.cseqNumber!);
+        (m) => m.method == 'REGISTER' && m.cseqNumber! > last.cseqNumber!,
+      );
     });
   });
 

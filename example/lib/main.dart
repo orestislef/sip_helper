@@ -43,18 +43,26 @@ class _SoftphonePageState extends State<SoftphonePage> {
   @override
   void initState() {
     super.initState();
-    _subs.add(sip.connectionStateStream.listen((registered) {
-      setState(() => _registered = registered);
-    }));
+    _subs.add(
+      sip.connectionStateStream.listen((registered) {
+        setState(() => _registered = registered);
+      }),
+    );
     _subs.add(sip.incomingCallStream.listen((_) => setState(() {})));
-    _subs.add(sip.callEventStream.listen((e) {
-      setState(() => _status = '${e.call?.displayName ?? e.callId}: ${e.event.name}');
-    }));
-    _subs.add(sip.errorStream.listen((error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
-    }));
+    _subs.add(
+      sip.callEventStream.listen((e) {
+        setState(
+          () => _status = '${e.call?.displayName ?? e.callId}: ${e.event.name}',
+        );
+      }),
+    );
+    _subs.add(
+      sip.errorStream.listen((error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
+      }),
+    );
   }
 
   @override
@@ -71,12 +79,14 @@ class _SoftphonePageState extends State<SoftphonePage> {
       if (_registered) {
         await sip.disconnect();
       } else {
-        await sip.initialize(SipConfiguration(
-          server: _server.text.trim(),
-          port: int.tryParse(_port.text) ?? 5060,
-          username: _user.text.trim(),
-          password: _password.text,
-        ));
+        await sip.initialize(
+          SipConfiguration(
+            server: _server.text.trim(),
+            port: int.tryParse(_port.text) ?? 5060,
+            username: _user.text.trim(),
+            password: _password.text,
+          ),
+        );
         await sip.requestMicrophonePermission();
         await sip.connect();
       }
@@ -105,8 +115,11 @@ class _SoftphonePageState extends State<SoftphonePage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Icon(Icons.circle,
-                size: 14, color: _registered ? Colors.green : Colors.grey),
+            child: Icon(
+              Icons.circle,
+              size: 14,
+              color: _registered ? Colors.green : Colors.grey,
+            ),
           ),
         ],
       ),
@@ -124,34 +137,47 @@ class _SoftphonePageState extends State<SoftphonePage> {
             child: Text(_registered ? 'Disconnect' : 'Register'),
           ),
           const SizedBox(height: 24),
-          Row(children: [
-            Expanded(child: _field(_dial, 'Number to call', number: true)),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: _registered ? _call : null,
-              icon: const Icon(Icons.call),
-            ),
-          ]),
+          Row(
+            children: [
+              Expanded(child: _field(_dial, 'Number to call', number: true)),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: _registered ? _call : null,
+                icon: const Icon(Icons.call),
+              ),
+            ],
+          ),
           if (_status != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(_status!, style: Theme.of(context).textTheme.bodySmall),
+              child: Text(
+                _status!,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
-          for (final call in calls) _CallCard(call: call, onChanged: () => setState(() {})),
+          for (final call in calls)
+            _CallCard(call: call, onChanged: () => setState(() {})),
         ],
       ),
     );
   }
 
-  Widget _field(TextEditingController c, String label,
-      {bool number = false, bool obscure = false}) {
+  Widget _field(
+    TextEditingController c,
+    String label, {
+    bool number = false,
+    bool obscure = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextField(
         controller: c,
         obscureText: obscure,
         keyboardType: number ? TextInputType.phone : TextInputType.text,
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
       ),
     );
   }
@@ -169,8 +195,10 @@ class _CallCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = call.callId!;
     final ringingIn =
-        call.state == CallState.ringing && call.direction == CallDirection.incoming;
-    final live = call.state == CallState.active || call.state == CallState.onHold;
+        call.state == CallState.ringing &&
+        call.direction == CallDirection.incoming;
+    final live =
+        call.state == CallState.active || call.state == CallState.onHold;
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
@@ -178,65 +206,78 @@ class _CallCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(call.displayName, style: Theme.of(context).textTheme.titleMedium),
-            Text([
-              call.direction == CallDirection.incoming ? 'Incoming' : 'Outgoing',
-              call.stateText,
-              if (call.isRemoteHold) 'held by other side',
-            ].join(' / ')),
+            Text(
+              call.displayName,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Text(
+              [
+                call.direction == CallDirection.incoming
+                    ? 'Incoming'
+                    : 'Outgoing',
+                call.stateText,
+                if (call.isRemoteHold) 'held by other side',
+              ].join(' / '),
+            ),
             const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              if (ringingIn)
-                FilledButton.icon(
-                  onPressed: () => sip.answerCall(id),
-                  icon: const Icon(Icons.call),
-                  label: const Text('Answer'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (ringingIn)
+                  FilledButton.icon(
+                    onPressed: () => sip.answerCall(id),
+                    icon: const Icon(Icons.call),
+                    label: const Text('Answer'),
+                  ),
+                if (live)
+                  OutlinedButton(
+                    onPressed: () async {
+                      if (call.state == CallState.onHold) {
+                        await sip.unholdCall(id);
+                      } else {
+                        await sip.holdCall(id);
+                      }
+                      onChanged();
+                    },
+                    child: Text(
+                      call.state == CallState.onHold ? 'Resume' : 'Hold',
+                    ),
+                  ),
+                if (live)
+                  OutlinedButton(
+                    onPressed: () {
+                      sip.setMuted(!sip.isMuted);
+                      onChanged();
+                    },
+                    child: Text(sip.isMuted ? 'Unmute' : 'Mute'),
+                  ),
+                if (live)
+                  OutlinedButton(
+                    onPressed: () async {
+                      await sip.setSpeakerphone(!sip.isSpeakerphoneOn);
+                      onChanged();
+                    },
+                    child: Text(sip.isSpeakerphoneOn ? 'Earpiece' : 'Speaker'),
+                  ),
+                if (live)
+                  OutlinedButton(
+                    onPressed: () => _keypad(context, id),
+                    child: const Text('Keypad'),
+                  ),
+                if (live)
+                  OutlinedButton(
+                    onPressed: () => _transfer(context, id),
+                    child: const Text('Transfer'),
+                  ),
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(foregroundColor: Colors.red),
+                  onPressed: () => sip.hangupCall(id),
+                  icon: const Icon(Icons.call_end),
+                  label: Text(ringingIn ? 'Decline' : 'Hang up'),
                 ),
-              if (live)
-                OutlinedButton(
-                  onPressed: () async {
-                    if (call.state == CallState.onHold) {
-                      await sip.unholdCall(id);
-                    } else {
-                      await sip.holdCall(id);
-                    }
-                    onChanged();
-                  },
-                  child: Text(call.state == CallState.onHold ? 'Resume' : 'Hold'),
-                ),
-              if (live)
-                OutlinedButton(
-                  onPressed: () {
-                    sip.setMuted(!sip.isMuted);
-                    onChanged();
-                  },
-                  child: Text(sip.isMuted ? 'Unmute' : 'Mute'),
-                ),
-              if (live)
-                OutlinedButton(
-                  onPressed: () async {
-                    await sip.setSpeakerphone(!sip.isSpeakerphoneOn);
-                    onChanged();
-                  },
-                  child: Text(sip.isSpeakerphoneOn ? 'Earpiece' : 'Speaker'),
-                ),
-              if (live)
-                OutlinedButton(
-                  onPressed: () => _keypad(context, id),
-                  child: const Text('Keypad'),
-                ),
-              if (live)
-                OutlinedButton(
-                  onPressed: () => _transfer(context, id),
-                  child: const Text('Transfer'),
-                ),
-              FilledButton.tonalIcon(
-                style: FilledButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: () => sip.hangupCall(id),
-                icon: const Icon(Icons.call_end),
-                label: Text(ringingIn ? 'Decline' : 'Hang up'),
-              ),
-            ]),
+              ],
+            ),
           ],
         ),
       ),
@@ -275,7 +316,10 @@ class _CallCard extends StatelessWidget {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Transfer'),

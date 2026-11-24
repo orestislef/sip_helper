@@ -16,10 +16,12 @@ Map<String, String> _params(String header) {
 
 void main() {
   test('RFC 2617 reference vector (qop=auth)', () {
-    final c = DigestChallenge.parse(
-        'Digest realm="testrealm@host.com", qop="auth,auth-int", '
-        'nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093", '
-        'opaque="5ccc069c403ebaf9f0171e9517f40e41"')!;
+    final c =
+        DigestChallenge.parse(
+          'Digest realm="testrealm@host.com", qop="auth,auth-int", '
+          'nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093", '
+          'opaque="5ccc069c403ebaf9f0171e9517f40e41"',
+        )!;
     final header = c.authorize(
       method: 'GET',
       uri: '/dir/index.html',
@@ -35,13 +37,16 @@ void main() {
   });
 
   test('legacy challenge without qop', () {
-    final c = DigestChallenge.parse(
-        'Digest algorithm=MD5, realm="asterisk", nonce="1a2b3c"')!;
+    final c =
+        DigestChallenge.parse(
+          'Digest algorithm=MD5, realm="asterisk", nonce="1a2b3c"',
+        )!;
     final header = c.authorize(
-        method: 'REGISTER',
-        uri: 'sip:pbx.example.com',
-        username: '1001',
-        password: 'secret');
+      method: 'REGISTER',
+      uri: 'sip:pbx.example.com',
+      username: '1001',
+      password: 'secret',
+    );
     final ha1 = _md5('1001:asterisk:secret');
     final ha2 = _md5('REGISTER:sip:pbx.example.com');
     final p = _params(header);
@@ -52,30 +57,49 @@ void main() {
 
   test('nonce count increases when a nonce is reused', () {
     final c = DigestChallenge.parse('Digest realm="r", nonce="n", qop=auth')!;
-    String nc() => _params(c.authorize(
-        method: 'REGISTER', uri: 'sip:x', username: 'u', password: 'p'))['nc']!;
+    String nc() =>
+        _params(
+          c.authorize(
+            method: 'REGISTER',
+            uri: 'sip:x',
+            username: 'u',
+            password: 'p',
+          ),
+        )['nc']!;
     expect(nc(), '00000001');
     expect(nc(), '00000002');
   });
 
   test('stale flag, proxy header name and unsupported algorithms', () {
-    final c = DigestChallenge.parse('Digest realm="r", nonce="n", stale=TRUE',
-        isProxy: true)!;
+    final c =
+        DigestChallenge.parse(
+          'Digest realm="r", nonce="n", stale=TRUE',
+          isProxy: true,
+        )!;
     expect(c.stale, isTrue);
     expect(c.responseHeaderName, 'Proxy-Authorization');
     expect(DigestChallenge.parse('Basic realm="r"'), isNull);
-    expect(DigestChallenge.parse('Digest realm="r", nonce="n", algorithm=AKAv1-MD5'),
-        isNull);
+    expect(
+      DigestChallenge.parse('Digest realm="r", nonce="n", algorithm=AKAv1-MD5'),
+      isNull,
+    );
   });
 
   test('SHA-256 is preferred when offered next to MD5', () {
-    final c = DigestChallenge.pick([
-      'Digest realm="r", nonce="n", algorithm=MD5',
-      'Digest realm="r", nonce="n", algorithm=SHA-256',
-    ])!;
+    final c =
+        DigestChallenge.pick([
+          'Digest realm="r", nonce="n", algorithm=MD5',
+          'Digest realm="r", nonce="n", algorithm=SHA-256',
+        ])!;
     expect(c.algorithm, 'SHA-256');
-    final p = _params(c.authorize(
-        method: 'INVITE', uri: 'sip:1@r', username: 'u', password: 'p'));
+    final p = _params(
+      c.authorize(
+        method: 'INVITE',
+        uri: 'sip:1@r',
+        username: 'u',
+        password: 'p',
+      ),
+    );
     String h(String s) => sha256.convert(utf8.encode(s)).toString();
     expect(p['response'], h('${h('u:r:p')}:n:${h('INVITE:sip:1@r')}'));
   });

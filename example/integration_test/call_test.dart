@@ -55,11 +55,14 @@ class _Pbx {
   }
 
   static Future<_Pbx> start() async => _Pbx(
-      await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 0),
-      await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0));
+    await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 0),
+    await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0),
+  );
 
-  Future<String> next(String startsWith,
-      {Duration timeout = const Duration(seconds: 10)}) {
+  Future<String> next(
+    String startsWith, {
+    Duration timeout = const Duration(seconds: 10),
+  }) {
     bool test(String m) => m.startsWith(startsWith);
     final i = _inbox.indexWhere(test);
     if (i != -1) return Future.value(_inbox.removeAt(i));
@@ -97,17 +100,25 @@ class _Pbx {
     return i == -1 ? '' : msg.substring(i + 2);
   }
 
-  String respond(String req, int code, String reason,
-      {String? toTag, List<String> extra = const [], String? sdp}) {
+  String respond(
+    String req,
+    int code,
+    String reason, {
+    String? toTag,
+    List<String> extra = const [],
+    String? sdp,
+  }) {
     final b = StringBuffer('SIP/2.0 $code $reason\r\n');
     for (final line in req.split('\n')) {
       if (line.toLowerCase().startsWith('via:')) b.write('$line\r\n');
     }
     b.write('From: ${header(req, 'From')}\r\n');
     final to = header(req, 'To');
-    b.write(toTag != null && !to.contains('tag=')
-        ? 'To: $to;tag=$toTag\r\n'
-        : 'To: $to\r\n');
+    b.write(
+      toTag != null && !to.contains('tag=')
+          ? 'To: $to;tag=$toTag\r\n'
+          : 'To: $to\r\n',
+    );
     b.write('Call-ID: ${header(req, 'Call-ID')}\r\n');
     b.write('CSeq: ${header(req, 'CSeq')}\r\n');
     for (final h in extra) {
@@ -118,17 +129,17 @@ class _Pbx {
   }
 
   String sdp({String direction = 'sendrecv'}) => [
-        'v=0',
-        'o=- 1 1 IN IP4 127.0.0.1',
-        's=test',
-        'c=IN IP4 127.0.0.1',
-        't=0 0',
-        'm=audio ${rtp.port} RTP/AVP 8 101',
-        'a=rtpmap:8 PCMA/8000',
-        'a=rtpmap:101 telephone-event/8000',
-        'a=$direction',
-        '',
-      ].join('\r\n');
+    'v=0',
+    'o=- 1 1 IN IP4 127.0.0.1',
+    's=test',
+    'c=IN IP4 127.0.0.1',
+    't=0 0',
+    'm=audio ${rtp.port} RTP/AVP 8 101',
+    'a=rtpmap:8 PCMA/8000',
+    'a=rtpmap:101 telephone-event/8000',
+    'a=$direction',
+    '',
+  ].join('\r\n');
 
   void _finish(StringBuffer b, String? sdp) {
     if (sdp == null) {
@@ -150,7 +161,11 @@ class _Pbx {
       final bd = ByteData.sublistView(pcm);
       for (var i = 0; i < 160; i++) {
         final t = (p * 160 + i) / 8000;
-        bd.setInt16(i * 2, (12000 * sin(2 * pi * 1000 * t)).round(), Endian.little);
+        bd.setInt16(
+          i * 2,
+          (12000 * sin(2 * pi * 1000 * t)).round(),
+          Endian.little,
+        );
       }
       final payload = PcmaEncoder.encode(pcm);
       final pkt = Uint8List(12 + payload.length)
@@ -180,8 +195,10 @@ class _Pbx {
   }
 }
 
-Future<void> _eventually(bool Function() test,
-    {Duration timeout = const Duration(seconds: 10)}) async {
+Future<void> _eventually(
+  bool Function() test, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
   final end = DateTime.now().add(timeout);
   while (!test()) {
     if (DateTime.now().isAfter(end)) throw TimeoutException('condition');
@@ -198,8 +215,9 @@ Future<void> _eventually(bool Function() test,
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('register, outgoing and incoming call with native audio',
-      (tester) async {
+  testWidgets('register, outgoing and incoming call with native audio', (
+    tester,
+  ) async {
     final log = <String>[];
     sipLogger = (m) {
       log.add(m);
@@ -216,22 +234,33 @@ void main() {
     ];
 
     try {
-      expect(await sip.requestMicrophonePermission(), isTrue,
-          reason: 'grant RECORD_AUDIO before running (adb install -g)');
+      expect(
+        await sip.requestMicrophonePermission(),
+        isTrue,
+        reason: 'grant RECORD_AUDIO before running (adb install -g)',
+      );
 
-      await sip.initialize(SipConfiguration(
-        server: '127.0.0.1',
-        port: pbx.sip.port,
-        username: '1001',
-        password: 'secret',
-        keepAliveInterval: 0,
-      ));
+      await sip.initialize(
+        SipConfiguration(
+          server: '127.0.0.1',
+          port: pbx.sip.port,
+          username: '1001',
+          password: 'secret',
+          keepAliveInterval: 0,
+        ),
+      );
       await sip.connect();
 
       // REGISTER with a digest challenge.
       final reg1 = await pbx.next('REGISTER');
-      pbx.send(pbx.respond(reg1, 401, 'Unauthorized',
-          extra: ['WWW-Authenticate: Digest realm="test", nonce="n1"']));
+      pbx.send(
+        pbx.respond(
+          reg1,
+          401,
+          'Unauthorized',
+          extra: ['WWW-Authenticate: Digest realm="test", nonce="n1"'],
+        ),
+      );
       final reg2 = await pbx.next('REGISTER');
       expect(_Pbx.header(reg2, 'Authorization'), contains('response='));
       pbx.send(pbx.respond(reg2, 200, 'OK', toTag: 'r'));
@@ -244,9 +273,16 @@ void main() {
       pbx.send(pbx.respond(invite, 180, 'Ringing', toTag: 'b'));
       await _eventually(() => events.contains('ringing'));
       await Future<void>.delayed(const Duration(milliseconds: 600));
-      pbx.send(pbx.respond(invite, 200, 'OK', toTag: 'b', extra: [
-        'Contact: <sip:2000@127.0.0.1:${pbx.sip.port}>',
-      ], sdp: pbx.sdp()));
+      pbx.send(
+        pbx.respond(
+          invite,
+          200,
+          'OK',
+          toTag: 'b',
+          extra: ['Contact: <sip:2000@127.0.0.1:${pbx.sip.port}>'],
+          sdp: pbx.sdp(),
+        ),
+      );
       await pbx.next('ACK');
       await _eventually(() => events.contains('confirmed'));
 
@@ -260,8 +296,11 @@ void main() {
       for (final p in audio) {
         distinct.addAll(p.sublist(12));
       }
-      expect(distinct.length, greaterThan(4),
-          reason: 'microphone delivers real samples, not constant silence');
+      expect(
+        distinct.length,
+        greaterThan(4),
+        reason: 'microphone delivers real samples, not constant silence',
+      );
 
       // Remote audio is decoded and played.
       await pbx.sendTone('127.0.0.1', phonePort, 2);
@@ -285,7 +324,9 @@ void main() {
       final hold = sip.holdCall(callId);
       final reinv = await pbx.next('INVITE');
       expect(_Pbx.body(reinv), contains('a=sendonly'));
-      pbx.send(pbx.respond(reinv, 200, 'OK', sdp: pbx.sdp(direction: 'recvonly')));
+      pbx.send(
+        pbx.respond(reinv, 200, 'OK', sdp: pbx.sdp(direction: 'recvonly')),
+      );
       await pbx.next('ACK');
       expect(await hold, isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -300,7 +341,10 @@ void main() {
       expect(await resume, isTrue);
       pbx.rtpIn.clear();
       await Future<void>.delayed(const Duration(seconds: 1));
-      expect(pbx.rtpIn.where((p) => (p[1] & 0x7F) == 8).length, greaterThan(30));
+      expect(
+        pbx.rtpIn.where((p) => (p[1] & 0x7F) == 8).length,
+        greaterThan(30),
+      );
 
       await sip.hangupCall(callId);
       final bye = await pbx.next('BYE');
@@ -312,7 +356,8 @@ void main() {
       final incoming = Completer<CallInfo>();
       final sub = sip.incomingCallStream.listen(incoming.complete);
       final inSdp = pbx.sdp();
-      final inv = 'INVITE sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
+      final inv =
+          'INVITE sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
           'Via: SIP/2.0/UDP 127.0.0.1:${pbx.sip.port};branch=z9hG4bKin1;rport\r\n'
           'From: "Front Desk" <sip:3000@127.0.0.1>;tag=in1\r\n'
           'To: <sip:1001@127.0.0.1>\r\n'
@@ -330,26 +375,35 @@ void main() {
       await sip.answerCall('incoming-1');
       final ok = await pbx.next('SIP/2.0 200');
       final (_, inPort) = _sdpEndpoint(_Pbx.body(ok));
-      final toTag = RegExp(r'tag=([^;\s>]+)').firstMatch(_Pbx.header(ok, 'To'))!.group(1)!;
-      pbx.send('ACK sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
-          'Via: SIP/2.0/UDP 127.0.0.1:${pbx.sip.port};branch=z9hG4bKack1;rport\r\n'
-          'From: "Front Desk" <sip:3000@127.0.0.1>;tag=in1\r\n'
-          'To: <sip:1001@127.0.0.1>;tag=$toTag\r\n'
-          'Call-ID: incoming-1\r\n'
-          'CSeq: 1 ACK\r\n'
-          'Content-Length: 0\r\n\r\n');
+      final toTag = RegExp(r'tag=([^;\s>]+)')
+          .firstMatch(_Pbx.header(ok, 'To'))!
+          .group(1)!;
+      pbx.send(
+        'ACK sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
+        'Via: SIP/2.0/UDP 127.0.0.1:${pbx.sip.port};branch=z9hG4bKack1;rport\r\n'
+        'From: "Front Desk" <sip:3000@127.0.0.1>;tag=in1\r\n'
+        'To: <sip:1001@127.0.0.1>;tag=$toTag\r\n'
+        'Call-ID: incoming-1\r\n'
+        'CSeq: 1 ACK\r\n'
+        'Content-Length: 0\r\n\r\n',
+      );
       await _eventually(() => events.contains('confirmed'));
       pbx.rtpIn.clear();
       await pbx.sendTone('127.0.0.1', inPort, 1);
-      expect(pbx.rtpIn.where((p) => (p[1] & 0x7F) == 8).length, greaterThan(30));
+      expect(
+        pbx.rtpIn.where((p) => (p[1] & 0x7F) == 8).length,
+        greaterThan(30),
+      );
 
-      pbx.send('BYE sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
-          'Via: SIP/2.0/UDP 127.0.0.1:${pbx.sip.port};branch=z9hG4bKbye1;rport\r\n'
-          'From: "Front Desk" <sip:3000@127.0.0.1>;tag=in1\r\n'
-          'To: <sip:1001@127.0.0.1>;tag=$toTag\r\n'
-          'Call-ID: incoming-1\r\n'
-          'CSeq: 2 BYE\r\n'
-          'Content-Length: 0\r\n\r\n');
+      pbx.send(
+        'BYE sip:1001@127.0.0.1:${pbx.clientPort} SIP/2.0\r\n'
+        'Via: SIP/2.0/UDP 127.0.0.1:${pbx.sip.port};branch=z9hG4bKbye1;rport\r\n'
+        'From: "Front Desk" <sip:3000@127.0.0.1>;tag=in1\r\n'
+        'To: <sip:1001@127.0.0.1>;tag=$toTag\r\n'
+        'Call-ID: incoming-1\r\n'
+        'CSeq: 2 BYE\r\n'
+        'Content-Length: 0\r\n\r\n',
+      );
       await pbx.next('SIP/2.0 200');
       await _eventually(() => events.contains('ended'));
 
@@ -359,8 +413,11 @@ void main() {
       expect(_Pbx.header(reg3, 'Expires'), '0');
       pbx.send(pbx.respond(reg3, 200, 'OK'));
       await unreg;
-      expect(errors.where((e) => !e.contains('permission')), isEmpty,
-          reason: errors.join('\n'));
+      expect(
+        errors.where((e) => !e.contains('permission')),
+        isEmpty,
+        reason: errors.join('\n'),
+      );
     } finally {
       for (final s in subs) {
         await s.cancel();

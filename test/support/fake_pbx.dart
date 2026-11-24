@@ -48,31 +48,40 @@ class FakePbx {
   int get port => socket.port;
 
   /// The next message matching [test] (already received or still to come).
-  Future<SipMessage> next(bool Function(SipMessage m) test,
-      {Duration timeout = const Duration(seconds: 5)}) {
+  Future<SipMessage> next(
+    bool Function(SipMessage m) test, {
+    Duration timeout = const Duration(seconds: 5),
+  }) {
     final idx = _inbox.indexWhere(test);
     if (idx != -1) return Future.value(_inbox.removeAt(idx));
     final w = _Waiter(test);
     _waiters.add(w);
-    return w.completer.future.timeout(timeout, onTimeout: () {
-      _waiters.remove(w);
-      throw TimeoutException('No matching SIP message within $timeout');
-    });
+    return w.completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        _waiters.remove(w);
+        throw TimeoutException('No matching SIP message within $timeout');
+      },
+    );
   }
 
-  Future<SipMessage> request(String method, {Duration? timeout}) =>
-      next((m) => m.method == method,
-          timeout: timeout ?? const Duration(seconds: 5));
+  Future<SipMessage> request(String method, {Duration? timeout}) => next(
+    (m) => m.method == method,
+    timeout: timeout ?? const Duration(seconds: 5),
+  );
 
   Future<SipMessage> response(int code, {String? method, Duration? timeout}) =>
       next(
-          (m) =>
-              m.statusCode == code && (method == null || m.cseqMethod == method),
-          timeout: timeout ?? const Duration(seconds: 5));
+        (m) =>
+            m.statusCode == code && (method == null || m.cseqMethod == method),
+        timeout: timeout ?? const Duration(seconds: 5),
+      );
 
   /// Fails when a message matching [test] arrives within [within].
-  Future<void> expectNothing(bool Function(SipMessage m) test,
-      {Duration within = const Duration(milliseconds: 700)}) async {
+  Future<void> expectNothing(
+    bool Function(SipMessage m) test, {
+    Duration within = const Duration(milliseconds: 700),
+  }) async {
     try {
       final m = await next(test, timeout: within);
       throw StateError('Unexpected message: ${m.startLine}');
@@ -89,17 +98,25 @@ class FakePbx {
   }
 
   /// Build a response to [req].
-  String respond(SipMessage req, int code, String reason,
-      {String? toTag, List<String> headers = const [], String? body}) {
+  String respond(
+    SipMessage req,
+    int code,
+    String reason, {
+    String? toTag,
+    List<String> headers = const [],
+    String? body,
+  }) {
     final b = StringBuffer('SIP/2.0 $code $reason\r\n');
     for (final v in req.headerAll('Via')) {
       b.write('Via: $v\r\n');
     }
     b.write('From: ${req.from}\r\n');
     final to = req.to ?? '';
-    b.write(toTag != null && extractTag(to) == null
-        ? 'To: $to;tag=$toTag\r\n'
-        : 'To: $to\r\n');
+    b.write(
+      toTag != null && extractTag(to) == null
+          ? 'To: $to;tag=$toTag\r\n'
+          : 'To: $to\r\n',
+    );
     b.write('Call-ID: ${req.callId}\r\n');
     b.write('CSeq: ${req.header('CSeq')}\r\n');
     for (final h in headers) {
@@ -110,18 +127,23 @@ class FakePbx {
   }
 
   /// Build a request from the server to the client.
-  String requestTo(String method,
-      {required String callId,
-      required int cseq,
-      required String from,
-      required String to,
-      String? branch,
-      List<String> headers = const [],
-      String? body,
-      String? contentType}) {
+  String requestTo(
+    String method, {
+    required String callId,
+    required int cseq,
+    required String from,
+    required String to,
+    String? branch,
+    List<String> headers = const [],
+    String? body,
+    String? contentType,
+  }) {
     final b = StringBuffer(
-        '$method sip:1001@127.0.0.1:$clientPort SIP/2.0\r\n');
-    b.write('Via: SIP/2.0/UDP 127.0.0.1:$port;rport;branch=${branch ?? 'z9hG4bK$method$cseq${callId.hashCode}'}\r\n');
+      '$method sip:1001@127.0.0.1:$clientPort SIP/2.0\r\n',
+    );
+    b.write(
+      'Via: SIP/2.0/UDP 127.0.0.1:$port;rport;branch=${branch ?? 'z9hG4bK$method$cseq${callId.hashCode}'}\r\n',
+    );
     b.write('Max-Forwards: 70\r\n');
     b.write('From: $from\r\n');
     b.write('To: $to\r\n');
@@ -155,11 +177,12 @@ class _Waiter {
 }
 
 /// SDP the fake server offers or answers with.
-String pbxSdp(
-    {int port = 30000,
-    String payloads = '8 0 101',
-    String direction = 'sendrecv',
-    String host = '127.0.0.1'}) {
+String pbxSdp({
+  int port = 30000,
+  String payloads = '8 0 101',
+  String direction = 'sendrecv',
+  String host = '127.0.0.1',
+}) {
   final pts = payloads.split(' ').map(int.parse);
   return [
     'v=0',
@@ -204,8 +227,12 @@ class FakeMedia implements SipMediaHandler {
   int? get localPort => open ? 40000 : null;
 
   @override
-  void setRemote(String host, int port,
-      {required int payloadType, int? dtmfPayloadType}) {
+  void setRemote(
+    String host,
+    int port, {
+    required int payloadType,
+    int? dtmfPayloadType,
+  }) {
     remotes.add('$host:$port/$payloadType/${dtmfPayloadType ?? '-'}');
   }
 
@@ -236,8 +263,10 @@ class FakeMedia implements SipMediaHandler {
 }
 
 /// Poll [condition] until it holds or [timeout] passes.
-Future<void> eventually(bool Function() condition,
-    {Duration timeout = const Duration(seconds: 5)}) async {
+Future<void> eventually(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
   final end = DateTime.now().add(timeout);
   while (!condition()) {
     if (DateTime.now().isAfter(end)) {

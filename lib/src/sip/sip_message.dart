@@ -67,10 +67,12 @@ class SipMessage {
       }
       final colon = line.indexOf(':');
       if (colon <= 0) continue;
-      headers.add(MapEntry(
-        line.substring(0, colon).trim(),
-        line.substring(colon + 1).trim(),
-      ));
+      headers.add(
+        MapEntry(
+          line.substring(0, colon).trim(),
+          line.substring(colon + 1).trim(),
+        ),
+      );
     }
     // Over UDP the datagram boundary ends the body, so Content-Length is not
     // needed to find it.
@@ -187,8 +189,10 @@ List<String> splitHeaderList(String value) {
 
 /// The `tag` parameter of a From/To value, or null.
 String? extractTag(String headerValue) {
-  final m = RegExp(r';\s*tag=([^\s;>,]+)', caseSensitive: false)
-      .firstMatch(headerValue);
+  final m = RegExp(
+    r';\s*tag=([^\s;>,]+)',
+    caseSensitive: false,
+  ).firstMatch(headerValue);
   return m?.group(1);
 }
 
@@ -203,8 +207,10 @@ String stripTag(String headerValue) {
 String? extractUri(String headerValue) {
   final angle = RegExp(r'<([^>]+)>').firstMatch(headerValue);
   if (angle != null) return angle.group(1)!.trim();
-  final bare =
-      RegExp(r'(sips?:[^\s;,>]+)', caseSensitive: false).firstMatch(headerValue);
+  final bare = RegExp(
+    r'(sips?:[^\s;,>]+)',
+    caseSensitive: false,
+  ).firstMatch(headerValue);
   return bare?.group(1);
 }
 
@@ -234,9 +240,10 @@ String? extractDisplayName(String headerValue) {
 /// A `;name=value` parameter of a header value (Via branch, received, ...).
 /// Returns '' for a parameter present without a value, null when absent.
 String? headerParam(String headerValue, String name) {
-  final m = RegExp(';\\s*$name(?:=([^;,\\s>]*))?(?=[;,\\s>]|\$)',
-          caseSensitive: false)
-      .firstMatch(headerValue);
+  final m = RegExp(
+    ';\\s*$name(?:=([^;,\\s>]*))?(?=[;,\\s>]|\$)',
+    caseSensitive: false,
+  ).firstMatch(headerValue);
   if (m == null) return null;
   return m.group(1) ?? '';
 }

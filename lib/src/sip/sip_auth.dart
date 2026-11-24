@@ -47,11 +47,12 @@ class DigestChallenge {
     if (realm == null || nonce == null) return null;
     final algorithm = (params['algorithm'] ?? 'MD5').toUpperCase();
     if (!_supported.contains(algorithm)) return null;
-    final qop = (params['qop'] ?? '')
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final qop =
+        (params['qop'] ?? '')
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .where((s) => s.isNotEmpty)
+            .toList();
     return DigestChallenge(
       realm: realm,
       nonce: nonce,
@@ -94,13 +95,15 @@ class DigestChallenge {
     String body = '',
     String? cnonce,
   }) {
-    String h(String s) => algorithm.startsWith('SHA-256')
-        ? sha256.convert(utf8.encode(s)).toString()
-        : md5.convert(utf8.encode(s)).toString();
+    String h(String s) =>
+        algorithm.startsWith('SHA-256')
+            ? sha256.convert(utf8.encode(s)).toString()
+            : md5.convert(utf8.encode(s)).toString();
 
-    final useQop = qop.contains('auth')
-        ? 'auth'
-        : (qop.contains('auth-int') ? 'auth-int' : null);
+    final useQop =
+        qop.contains('auth')
+            ? 'auth'
+            : (qop.contains('auth-int') ? 'auth-int' : null);
     nonceCount++;
     final nc = nonceCount.toRadixString(16).padLeft(8, '0');
     final cn = cnonce ?? _randomHex(16);
@@ -109,17 +112,18 @@ class DigestChallenge {
     if (algorithm.endsWith('-SESS')) {
       ha1 = h('$ha1:$nonce:$cn');
     }
-    final ha2 = useQop == 'auth-int'
-        ? h('$method:$uri:${h(body)}')
-        : h('$method:$uri');
-    final response = useQop == null
-        ? h('$ha1:$nonce:$ha2')
-        : h('$ha1:$nonce:$nc:$cn:$useQop:$ha2');
+    final ha2 =
+        useQop == 'auth-int' ? h('$method:$uri:${h(body)}') : h('$method:$uri');
+    final response =
+        useQop == null
+            ? h('$ha1:$nonce:$ha2')
+            : h('$ha1:$nonce:$nc:$cn:$useQop:$ha2');
 
-    final b = StringBuffer()
-      ..write('Digest username="$username", realm="$realm", ')
-      ..write('nonce="$nonce", uri="$uri", response="$response", ')
-      ..write('algorithm=$algorithm');
+    final b =
+        StringBuffer()
+          ..write('Digest username="$username", realm="$realm", ')
+          ..write('nonce="$nonce", uri="$uri", response="$response", ')
+          ..write('algorithm=$algorithm');
     if (opaque != null) b.write(', opaque="$opaque"');
     if (useQop != null) b.write(', qop=$useQop, nc=$nc, cnonce="$cn"');
     return b.toString();
@@ -136,7 +140,9 @@ class DigestChallenge {
 
   static Map<String, String> _parseParams(String s) {
     final out = <String, String>{};
-    final re = RegExp(r'([A-Za-z0-9_-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^,\s]+))');
+    final re = RegExp(
+      r'([A-Za-z0-9_-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^,\s]+))',
+    );
     for (final m in re.allMatches(s)) {
       out[m.group(1)!.toLowerCase()] = m.group(2) ?? m.group(3) ?? '';
     }

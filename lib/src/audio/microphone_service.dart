@@ -66,8 +66,9 @@ class MicrophoneService {
     if (_starting) return true;
     _starting = true;
     try {
-      final recorder =
-          AudioPlatform.instance.createRecorder(deviceId: _inputDeviceId);
+      final recorder = AudioPlatform.instance.createRecorder(
+        deviceId: _inputDeviceId,
+      );
       recorder.onData = _onPcm;
       _pending.clear();
       final ok = await recorder.open();
@@ -115,7 +116,10 @@ class MicrophoneService {
       for (var i = 0; i + 1 < pcm.length; i += 2) {
         final s = bd.getInt16(i, Endian.little);
         bd.setInt16(
-            i, (s * _inputGain).round().clamp(-32768, 32767), Endian.little);
+          i,
+          (s * _inputGain).round().clamp(-32768, 32767),
+          Endian.little,
+        );
       }
     }
     onRawAudioCaptured?.call(pcm);

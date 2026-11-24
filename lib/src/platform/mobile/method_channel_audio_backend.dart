@@ -15,8 +15,10 @@ Future<T?> _invoke<T>(String method, [Object? args]) async {
   try {
     return await _channel.invokeMethod<T>(method, args);
   } on MissingPluginException {
-    sipLog('[Audio] Native plugin missing for $method, rebuild the app '
-        'after adding sip_helper');
+    sipLog(
+      '[Audio] Native plugin missing for $method, rebuild the app '
+      'after adding sip_helper',
+    );
     return null;
   } on PlatformException catch (e) {
     sipLog('[Audio] $method failed: ${e.code} ${e.message}');
@@ -30,8 +32,7 @@ AudioPlayer channelCreatePlayer({
   int bufferSize = 320,
   int sampleRate = 8000,
   int deviceId = defaultAudioDeviceId,
-}) =>
-    _ChannelAudioPlayer(sampleRate);
+}) => _ChannelAudioPlayer(sampleRate);
 
 /// [AudioRecorderFactory] for Android and iOS.
 AudioRecorder channelCreateRecorder({int deviceId = defaultAudioDeviceId}) =>
@@ -117,12 +118,9 @@ class _ChannelAudioRecorder implements AudioRecorder {
       if (ok == true) _invoke<void>('closeRecorder');
       return false;
     }
-    _sub = _micChannel.receiveBroadcastStream().listen(
-      (event) {
-        if (event is Uint8List) onData?.call(event);
-      },
-      onError: (Object e) => sipLog('[Audio] Microphone stream error: $e'),
-    );
+    _sub = _micChannel.receiveBroadcastStream().listen((event) {
+      if (event is Uint8List) onData?.call(event);
+    }, onError: (Object e) => sipLog('[Audio] Microphone stream error: $e'));
     return true;
   }
 

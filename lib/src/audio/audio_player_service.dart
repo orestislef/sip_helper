@@ -56,7 +56,9 @@ class AudioPlayerService {
       sound.startVoicePlayback();
       if (!sound.isVoicePlaying) {
         _dropCount++;
-        if (_dropCount <= 3) sipLog('[AudioPlayer] Voice player failed to start');
+        if (_dropCount <= 3) {
+          sipLog('[AudioPlayer] Voice player failed to start');
+        }
         return;
       }
     }
@@ -66,8 +68,10 @@ class AudioPlayerService {
     sound.writeVoiceAudio(_upsample2x(pcm8k));
 
     if (_packetCount <= 3 || _packetCount % 500 == 0) {
-      sipLog('[AudioPlayer] Packet #$_packetCount, ${payload.length} bytes '
-          '(PT $payloadType)');
+      sipLog(
+        '[AudioPlayer] Packet #$_packetCount, ${payload.length} bytes '
+        '(PT $payloadType)',
+      );
     }
   }
 
@@ -91,8 +95,10 @@ class AudioPlayerService {
 
   void stop() {
     if (_isReady) {
-      sipLog('[AudioPlayer] Stopping. Played $_packetCount packets, '
-          '$_dropCount drops');
+      sipLog(
+        '[AudioPlayer] Stopping. Played $_packetCount packets, '
+        '$_dropCount drops',
+      );
     }
     SoundService.instance.stopVoicePlayback();
     _isReady = false;

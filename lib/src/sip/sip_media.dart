@@ -15,8 +15,12 @@ abstract class SipMediaHandler {
 
   /// Send audio to [host]:[port] with [payloadType] (8 = PCMA, 0 = PCMU).
   /// [dtmfPayloadType] is the negotiated telephone-event payload, if any.
-  void setRemote(String host, int port,
-      {required int payloadType, int? dtmfPayloadType});
+  void setRemote(
+    String host,
+    int port, {
+    required int payloadType,
+    int? dtmfPayloadType,
+  });
 
   /// RTP endpoints (`host:port`) of the other, held calls. Their packets
   /// (music on hold) must never reach the speaker.

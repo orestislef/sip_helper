@@ -9,8 +9,7 @@ AudioPlayer stubCreatePlayer({
   int bufferSize = 320,
   int sampleRate = 8000,
   int deviceId = defaultAudioDeviceId,
-}) =>
-    StubAudioPlayer();
+}) => StubAudioPlayer();
 
 /// Stub [AudioRecorderFactory] for unsupported platforms.
 AudioRecorder stubCreateRecorder({int deviceId = defaultAudioDeviceId}) =>
@@ -27,7 +26,9 @@ class StubAudioPlayer implements AudioPlayer {
 
   @override
   bool open() {
-    sipLog('[StubAudio] AudioPlayer.open() is not implemented on this platform');
+    sipLog(
+      '[StubAudio] AudioPlayer.open() is not implemented on this platform',
+    );
     return false;
   }
 
@@ -52,7 +53,8 @@ class StubAudioRecorder implements AudioRecorder {
   @override
   bool open() {
     sipLog(
-        '[StubAudio] AudioRecorder.open() is not implemented on this platform');
+      '[StubAudio] AudioRecorder.open() is not implemented on this platform',
+    );
     return false;
   }
 

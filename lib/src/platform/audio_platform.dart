@@ -103,12 +103,13 @@ class NoopAudioSession implements AudioSession {
 }
 
 /// Factory function type for creating an [AudioPlayer].
-typedef AudioPlayerFactory = AudioPlayer Function({
-  int numBuffers,
-  int bufferSize,
-  int sampleRate,
-  int deviceId,
-});
+typedef AudioPlayerFactory =
+    AudioPlayer Function({
+      int numBuffers,
+      int bufferSize,
+      int sampleRate,
+      int deviceId,
+    });
 
 /// Factory function type for creating an [AudioRecorder].
 typedef AudioRecorderFactory = AudioRecorder Function({int deviceId});

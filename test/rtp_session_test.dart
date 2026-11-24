@@ -32,8 +32,20 @@ class _Peer {
 }
 
 Uint8List _rtp(int pt, int seq, List<int> payload) => Uint8List.fromList([
-      0x80, pt, seq >> 8, seq & 0xFF, 0, 0, 0, 0, 1, 2, 3, 4, ...payload,
-    ]);
+  0x80,
+  pt,
+  seq >> 8,
+  seq & 0xFF,
+  0,
+  0,
+  0,
+  0,
+  1,
+  2,
+  3,
+  4,
+  ...payload,
+]);
 
 int _seq(Uint8List p) => (p[2] << 8) | p[3];
 int _ts(Uint8List p) => (p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
@@ -59,29 +71,33 @@ void main() {
     peer.socket.close();
   });
 
-  test('initialize is idempotent (the advertised port never changes)',
-      () async {
-    final port = rtp.localPort;
-    await rtp.initialize();
-    expect(rtp.localPort, port);
-  });
+  test(
+    'initialize is idempotent (the advertised port never changes)',
+    () async {
+      final port = rtp.localPort;
+      await rtp.initialize();
+      expect(rtp.localPort, port);
+    },
+  );
 
-  test('audio packets: header, marker on first, timestamps by samples',
-      () async {
-    rtp.sendAudio(Uint8List(160), 8);
-    rtp.sendAudio(Uint8List(160), 8);
-    rtp.sendAudio(Uint8List(80), 0);
-    await eventually(() => peer.packets.length == 3);
-    final p = peer.packets;
-    expect(p[0][0], 0x80);
-    expect(p[0][1], 0x80 | 8); // marker + PCMA
-    expect(p[1][1], 8);
-    expect(p[2][1], 0);
-    expect(_seq(p[1]), (_seq(p[0]) + 1) & 0xFFFF);
-    expect(_ts(p[1]) - _ts(p[0]), 160);
-    expect(_ts(p[2]) - _ts(p[1]), 160);
-    expect(p[0].length, 12 + 160);
-  });
+  test(
+    'audio packets: header, marker on first, timestamps by samples',
+    () async {
+      rtp.sendAudio(Uint8List(160), 8);
+      rtp.sendAudio(Uint8List(160), 8);
+      rtp.sendAudio(Uint8List(80), 0);
+      await eventually(() => peer.packets.length == 3);
+      final p = peer.packets;
+      expect(p[0][0], 0x80);
+      expect(p[0][1], 0x80 | 8); // marker + PCMA
+      expect(p[1][1], 8);
+      expect(p[2][1], 0);
+      expect(_seq(p[1]), (_seq(p[0]) + 1) & 0xFFFF);
+      expect(_ts(p[1]) - _ts(p[0]), 160);
+      expect(_ts(p[2]) - _ts(p[1]), 160);
+      expect(p[0].length, 12 + 160);
+    },
+  );
 
   test('silence matches the codec', () async {
     rtp.sendPayloadType = 0;
@@ -90,29 +106,31 @@ void main() {
     expect(peer.packets.single.sublist(12), everyElement(0xFF));
   });
 
-  test('RFC 4733 DTMF: same timestamp, growing duration, three end packets',
-      () async {
-    rtp.sendAudio(Uint8List(160), 8);
-    await rtp.sendDtmf('#', durationMs: 60);
-    rtp.sendAudio(Uint8List(160), 8);
-    await eventually(() => peer.packets.length == 1 + 3 + 3 + 1);
-    final events = peer.packets.where((p) => (p[1] & 0x7F) == 101).toList();
-    expect(events, hasLength(6));
-    final start = _ts(events.first);
-    for (final e in events) {
-      expect(_ts(e), start);
-      expect(e[12], 11); // '#'
-    }
-    expect(events.first[1] & 0x80, 0x80); // marker on the first
-    expect(events[1][1] & 0x80, 0);
-    final durations = events.map((e) => (e[14] << 8) | e[15]).toList();
-    expect(durations, [160, 320, 480, 480, 480, 480]);
-    expect(events.take(3).every((e) => e[13] & 0x80 == 0), isTrue);
-    expect(events.skip(3).every((e) => e[13] & 0x80 == 0x80), isTrue);
-    final after = peer.packets.last;
-    expect(after[1] & 0x7F, 8);
-    expect(_ts(after), start + 480);
-  });
+  test(
+    'RFC 4733 DTMF: same timestamp, growing duration, three end packets',
+    () async {
+      rtp.sendAudio(Uint8List(160), 8);
+      await rtp.sendDtmf('#', durationMs: 60);
+      rtp.sendAudio(Uint8List(160), 8);
+      await eventually(() => peer.packets.length == 1 + 3 + 3 + 1);
+      final events = peer.packets.where((p) => (p[1] & 0x7F) == 101).toList();
+      expect(events, hasLength(6));
+      final start = _ts(events.first);
+      for (final e in events) {
+        expect(_ts(e), start);
+        expect(e[12], 11); // '#'
+      }
+      expect(events.first[1] & 0x80, 0x80); // marker on the first
+      expect(events[1][1] & 0x80, 0);
+      final durations = events.map((e) => (e[14] << 8) | e[15]).toList();
+      expect(durations, [160, 320, 480, 480, 480, 480]);
+      expect(events.take(3).every((e) => e[13] & 0x80 == 0), isTrue);
+      expect(events.skip(3).every((e) => e[13] & 0x80 == 0x80), isTrue);
+      final after = peer.packets.last;
+      expect(after[1] & 0x7F, 8);
+      expect(_ts(after), start + 480);
+    },
+  );
 
   test('accepts the focused endpoint and drops other sources', () async {
     final stranger = await _Peer.start();
@@ -124,19 +142,21 @@ void main() {
     stranger.socket.close();
   });
 
-  test('latches onto a steady new source when the announced one is silent',
-      () async {
-    final moved = await _Peer.start();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    for (var i = 0; i < 10; i++) {
-      moved.sendTo(rtp.localPort!, _rtp(0, i, List.filled(160, 0xFF)));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-    }
-    await eventually(() => received.isNotEmpty);
-    expect(rtp.remoteEndpoint, '127.0.0.1:${moved.socket.port}');
-    expect(received.first, '0:160');
-    moved.socket.close();
-  });
+  test(
+    'latches onto a steady new source when the announced one is silent',
+    () async {
+      final moved = await _Peer.start();
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      for (var i = 0; i < 10; i++) {
+        moved.sendTo(rtp.localPort!, _rtp(0, i, List.filled(160, 0xFF)));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      await eventually(() => received.isNotEmpty);
+      expect(rtp.remoteEndpoint, '127.0.0.1:${moved.socket.port}');
+      expect(received.first, '0:160');
+      moved.socket.close();
+    },
+  );
 
   test('never latches onto another call\'s endpoint', () async {
     final held = await _Peer.start();

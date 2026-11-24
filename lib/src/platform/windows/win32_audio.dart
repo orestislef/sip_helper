@@ -55,10 +55,16 @@ final DynamicLibrary _winmm = DynamicLibrary.open('winmm.dll');
 
 // waveOut
 final _waveOutOpen = _winmm.lookupFunction<
-    Uint32 Function(Pointer<IntPtr>, Uint32, Pointer<WAVEFORMATEX>, IntPtr,
-        IntPtr, Uint32),
-    int Function(Pointer<IntPtr>, int, Pointer<WAVEFORMATEX>, int, int,
-        int)>('waveOutOpen');
+  Uint32 Function(
+    Pointer<IntPtr>,
+    Uint32,
+    Pointer<WAVEFORMATEX>,
+    IntPtr,
+    IntPtr,
+    Uint32,
+  ),
+  int Function(Pointer<IntPtr>, int, Pointer<WAVEFORMATEX>, int, int, int)
+>('waveOutOpen');
 
 final _waveOutClose = _winmm
     .lookupFunction<Uint32 Function(IntPtr), int Function(int)>('waveOutClose');
@@ -67,31 +73,42 @@ final _waveOutReset = _winmm
     .lookupFunction<Uint32 Function(IntPtr), int Function(int)>('waveOutReset');
 
 final _waveOutPrepareHeader = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveOutPrepareHeader');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveOutPrepareHeader');
 
 final _waveOutUnprepareHeader = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveOutUnprepareHeader');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveOutUnprepareHeader');
 
 final _waveOutWrite = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveOutWrite');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveOutWrite');
 
 final _waveOutGetVolume = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<Uint32>),
-    int Function(int, Pointer<Uint32>)>('waveOutGetVolume');
+  Uint32 Function(IntPtr, Pointer<Uint32>),
+  int Function(int, Pointer<Uint32>)
+>('waveOutGetVolume');
 
-final _waveOutSetVolume = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Uint32),
-    int Function(int, int)>('waveOutSetVolume');
+final _waveOutSetVolume = _winmm
+    .lookupFunction<Uint32 Function(IntPtr, Uint32), int Function(int, int)>(
+      'waveOutSetVolume',
+    );
 
 // waveIn
 final _waveInOpen = _winmm.lookupFunction<
-    Uint32 Function(Pointer<IntPtr>, Uint32, Pointer<WAVEFORMATEX>, IntPtr,
-        IntPtr, Uint32),
-    int Function(Pointer<IntPtr>, int, Pointer<WAVEFORMATEX>, int, int,
-        int)>('waveInOpen');
+  Uint32 Function(
+    Pointer<IntPtr>,
+    Uint32,
+    Pointer<WAVEFORMATEX>,
+    IntPtr,
+    IntPtr,
+    Uint32,
+  ),
+  int Function(Pointer<IntPtr>, int, Pointer<WAVEFORMATEX>, int, int, int)
+>('waveInOpen');
 
 final _waveInClose = _winmm
     .lookupFunction<Uint32 Function(IntPtr), int Function(int)>('waveInClose');
@@ -106,31 +123,36 @@ final _waveInStop = _winmm
     .lookupFunction<Uint32 Function(IntPtr), int Function(int)>('waveInStop');
 
 final _waveInPrepareHeader = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveInPrepareHeader');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveInPrepareHeader');
 
 final _waveInUnprepareHeader = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveInUnprepareHeader');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveInUnprepareHeader');
 
 final _waveInAddBuffer = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
-    int Function(int, Pointer<WAVEHDR>, int)>('waveInAddBuffer');
+  Uint32 Function(IntPtr, Pointer<WAVEHDR>, Uint32),
+  int Function(int, Pointer<WAVEHDR>, int)
+>('waveInAddBuffer');
 
 // Device enumeration
 final _waveOutGetNumDevs = _winmm
     .lookupFunction<Uint32 Function(), int Function()>('waveOutGetNumDevs');
 
 final _waveOutGetDevCapsW = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<Uint8>, Uint32),
-    int Function(int, Pointer<Uint8>, int)>('waveOutGetDevCapsW');
+  Uint32 Function(IntPtr, Pointer<Uint8>, Uint32),
+  int Function(int, Pointer<Uint8>, int)
+>('waveOutGetDevCapsW');
 
 final _waveInGetNumDevs = _winmm
     .lookupFunction<Uint32 Function(), int Function()>('waveInGetNumDevs');
 
 final _waveInGetDevCapsW = _winmm.lookupFunction<
-    Uint32 Function(IntPtr, Pointer<Uint8>, Uint32),
-    int Function(int, Pointer<Uint8>, int)>('waveInGetDevCapsW');
+  Uint32 Function(IntPtr, Pointer<Uint8>, Uint32),
+  int Function(int, Pointer<Uint8>, int)
+>('waveInGetDevCapsW');
 
 // ── Device Enumeration Helper ─────────────────────────────────────────
 
@@ -147,8 +169,9 @@ class WinAudioDevices {
       try {
         final result = _waveOutGetDevCapsW(i, caps, _waveOutCapsSize);
         if (result == _mmsyserrNoerror) {
-          final namePtr =
-              Pointer<Utf16>.fromAddress(caps.address + _capsNameOffset);
+          final namePtr = Pointer<Utf16>.fromAddress(
+            caps.address + _capsNameOffset,
+          );
           devices.add(namePtr.toDartString());
         }
       } finally {
@@ -166,8 +189,9 @@ class WinAudioDevices {
       try {
         final result = _waveInGetDevCapsW(i, caps, _waveInCapsSize);
         if (result == _mmsyserrNoerror) {
-          final namePtr =
-              Pointer<Utf16>.fromAddress(caps.address + _capsNameOffset);
+          final namePtr = Pointer<Utf16>.fromAddress(
+            caps.address + _capsNameOffset,
+          );
           devices.add(namePtr.toDartString());
         }
       } finally {
@@ -207,10 +231,10 @@ class WinAudioPlayer {
     int bufferSize = 320,
     int sampleRate = 8000,
     int deviceId = _waveMapper,
-  })  : _numBuffers = numBuffers,
-        _bufferSize = bufferSize,
-        _sampleRate = sampleRate,
-        _deviceId = deviceId;
+  }) : _numBuffers = numBuffers,
+       _bufferSize = bufferSize,
+       _sampleRate = sampleRate,
+       _deviceId = deviceId;
 
   int _hWaveOut = 0;
   bool _isOpen = false;
@@ -248,7 +272,9 @@ class WinAudioPlayer {
       );
 
       if (result != _mmsyserrNoerror) {
-        sipLog('[WinAudio:Play] waveOutOpen failed: error $result (device=$_deviceId)');
+        sipLog(
+          '[WinAudio:Play] waveOutOpen failed: error $result (device=$_deviceId)',
+        );
         _free();
         return false;
       }
@@ -262,8 +288,7 @@ class WinAudioPlayer {
         hdr.ref.dwBufferLength = _bufferSize;
         hdr.ref.dwFlags = 0;
 
-        final r =
-            _waveOutPrepareHeader(_hWaveOut, hdr, sizeOf<WAVEHDR>());
+        final r = _waveOutPrepareHeader(_hWaveOut, hdr, sizeOf<WAVEHDR>());
         if (r != _mmsyserrNoerror) {
           calloc.free(buf);
           calloc.free(hdr);
@@ -313,8 +338,7 @@ class WinAudioPlayer {
 
       final hdr = _headers[idx];
       final buf = _dataPtrs[idx];
-      final chunkSize =
-          (pcm16Data.length - offset).clamp(0, _bufferSize);
+      final chunkSize = (pcm16Data.length - offset).clamp(0, _bufferSize);
 
       final view = buf.asTypedList(_bufferSize);
       view.setRange(0, chunkSize, pcm16Data, offset);
@@ -349,8 +373,7 @@ class WinAudioPlayer {
 
       final hdr = _headers[idx];
       final buf = _dataPtrs[idx];
-      final chunkSize =
-          (pcm16Data.length - offset).clamp(0, _bufferSize);
+      final chunkSize = (pcm16Data.length - offset).clamp(0, _bufferSize);
 
       final view = buf.asTypedList(_bufferSize);
       view.setRange(0, chunkSize, pcm16Data, offset);
@@ -468,7 +491,9 @@ class WinAudioRecorder {
       );
 
       if (result != _mmsyserrNoerror) {
-        sipLog('[WinAudio:Rec] waveInOpen failed: error $result (device=$_deviceId)');
+        sipLog(
+          '[WinAudio:Rec] waveInOpen failed: error $result (device=$_deviceId)',
+        );
         _free();
         return false;
       }
@@ -482,8 +507,7 @@ class WinAudioRecorder {
         hdr.ref.dwBufferLength = _bufferSize;
         hdr.ref.dwFlags = 0;
 
-        final r =
-            _waveInPrepareHeader(_hWaveIn, hdr, sizeOf<WAVEHDR>());
+        final r = _waveInPrepareHeader(_hWaveIn, hdr, sizeOf<WAVEHDR>());
         if (r != _mmsyserrNoerror) {
           calloc.free(buf);
           calloc.free(hdr);
@@ -504,8 +528,10 @@ class WinAudioRecorder {
 
       _isOpen = true;
 
-      _pollTimer =
-          Timer.periodic(const Duration(milliseconds: 10), _pollBuffers);
+      _pollTimer = Timer.periodic(
+        const Duration(milliseconds: 10),
+        _pollBuffers,
+      );
 
       sipLog('[WinAudio:Rec] Opened, ${_headers.length} buffers');
       return true;
@@ -524,8 +550,7 @@ class WinAudioRecorder {
       if (hdr.ref.dwFlags & _whdrDone != 0) {
         final recorded = hdr.ref.dwBytesRecorded;
         if (recorded > 0) {
-          final data =
-              Uint8List.fromList(hdr.ref.lpData.asTypedList(recorded));
+          final data = Uint8List.fromList(hdr.ref.lpData.asTypedList(recorded));
           onData?.call(data);
         }
 

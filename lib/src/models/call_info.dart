@@ -1,16 +1,8 @@
 /// Call state enum
-enum CallState {
-  ringing,
-  active,
-  onHold,
-  ended,
-}
+enum CallState { ringing, active, onHold, ended }
 
 /// Call direction
-enum CallDirection {
-  incoming,
-  outgoing,
-}
+enum CallDirection { incoming, outgoing }
 
 /// Call information model for SIP calls
 class CallInfo {

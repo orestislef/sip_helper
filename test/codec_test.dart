@@ -43,8 +43,10 @@ void main() {
     });
 
     test('encode throws on odd-length input', () {
-      expect(() => PcmaEncoder.encode(Uint8List(3)),
-          throwsA(isA<ArgumentError>()));
+      expect(
+        () => PcmaEncoder.encode(Uint8List(3)),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('roundtrip keeps a voice-level tone clean', () {
@@ -88,7 +90,9 @@ void main() {
       final bd = ByteData.sublistView(pcm);
       bd.setInt16(0, 32767, Endian.little);
       bd.setInt16(2, -32768, Endian.little);
-      final out = ByteData.sublistView(PcmuDecoder.decode(PcmuEncoder.encode(pcm)));
+      final out = ByteData.sublistView(
+        PcmuDecoder.decode(PcmuEncoder.encode(pcm)),
+      );
       expect(out.getInt16(0, Endian.little), greaterThan(30000));
       expect(out.getInt16(2, Endian.little), lessThan(-30000));
     });

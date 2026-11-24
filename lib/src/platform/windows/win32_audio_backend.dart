@@ -15,13 +15,12 @@ AudioPlayer win32CreatePlayer({
   int bufferSize = 320,
   int sampleRate = 8000,
   int deviceId = defaultAudioDeviceId,
-}) =>
-    _Win32AudioPlayerAdapter(
-      numBuffers: numBuffers,
-      bufferSize: bufferSize,
-      sampleRate: sampleRate,
-      deviceId: _resolveDeviceId(deviceId),
-    );
+}) => _Win32AudioPlayerAdapter(
+  numBuffers: numBuffers,
+  bufferSize: bufferSize,
+  sampleRate: sampleRate,
+  deviceId: _resolveDeviceId(deviceId),
+);
 
 /// WinMM [AudioRecorderFactory].
 AudioRecorder win32CreateRecorder({int deviceId = defaultAudioDeviceId}) =>
@@ -39,11 +38,11 @@ class _Win32AudioPlayerAdapter implements AudioPlayer {
     int sampleRate = 8000,
     int deviceId = _waveMapper,
   }) : _inner = WinAudioPlayer(
-          numBuffers: numBuffers,
-          bufferSize: bufferSize,
-          sampleRate: sampleRate,
-          deviceId: deviceId,
-        );
+         numBuffers: numBuffers,
+         bufferSize: bufferSize,
+         sampleRate: sampleRate,
+         deviceId: deviceId,
+       );
 
   @override
   bool get isPlayerOpen => _inner.isPlayerOpen;
@@ -70,7 +69,7 @@ class _Win32AudioRecorderAdapter implements AudioRecorder {
   final WinAudioRecorder _inner;
 
   _Win32AudioRecorderAdapter({int deviceId = _waveMapper})
-      : _inner = WinAudioRecorder(deviceId: deviceId);
+    : _inner = WinAudioRecorder(deviceId: deviceId);
 
   @override
   void Function(Uint8List pcm16Data)? get onData => _inner.onData;

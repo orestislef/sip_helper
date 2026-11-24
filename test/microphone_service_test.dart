@@ -31,7 +31,8 @@ void main() {
   setUp(() {
     AudioPlatform.override(
       createPlayer: stubCreatePlayer,
-      createRecorder: ({int deviceId = defaultAudioDeviceId}) => _FakeRecorder(),
+      createRecorder:
+          ({int deviceId = defaultAudioDeviceId}) => _FakeRecorder(),
       devices: stubDevices,
     );
     _FakeRecorder.allow = true;
@@ -55,24 +56,26 @@ void main() {
     expect(frames.every((f) => f.$1.length == 160 && f.$2 == 8), isTrue);
   });
 
-  test('encodes with the negotiated codec and mutes with codec silence',
-      () async {
-    mic.payloadType = 0;
-    await mic.startCapture();
-    final pcm = Uint8List(320);
-    ByteData.sublistView(pcm).setInt16(0, 12000, Endian.little);
-    _FakeRecorder.last!.onData!(pcm);
-    expect(frames.last.$2, 0);
-    expect(frames.last.$1.first, isNot(0xFF));
+  test(
+    'encodes with the negotiated codec and mutes with codec silence',
+    () async {
+      mic.payloadType = 0;
+      await mic.startCapture();
+      final pcm = Uint8List(320);
+      ByteData.sublistView(pcm).setInt16(0, 12000, Endian.little);
+      _FakeRecorder.last!.onData!(pcm);
+      expect(frames.last.$2, 0);
+      expect(frames.last.$1.first, isNot(0xFF));
 
-    mic.setMuted(true);
-    _FakeRecorder.last!.onData!(pcm);
-    expect(frames.last.$1, everyElement(0xFF));
+      mic.setMuted(true);
+      _FakeRecorder.last!.onData!(pcm);
+      expect(frames.last.$1, everyElement(0xFF));
 
-    mic.payloadType = 8;
-    _FakeRecorder.last!.onData!(pcm);
-    expect(frames.last.$1, everyElement(0xD5));
-  });
+      mic.payloadType = 8;
+      _FakeRecorder.last!.onData!(pcm);
+      expect(frames.last.$1, everyElement(0xD5));
+    },
+  );
 
   test('reports a recorder that cannot open (permission denied)', () async {
     _FakeRecorder.allow = false;

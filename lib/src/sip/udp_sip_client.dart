@@ -34,8 +34,13 @@ class _ClientTransaction {
   Duration interval;
   Duration elapsed = Duration.zero;
 
-  _ClientTransaction(this.key, this.message, this.isInvite, this.onTimeout,
-      this.interval);
+  _ClientTransaction(
+    this.key,
+    this.message,
+    this.isInvite,
+    this.onTimeout,
+    this.interval,
+  );
 }
 
 /// A 2xx to an INVITE that we retransmit until the ACK arrives (17.2.1).
@@ -61,7 +66,7 @@ class _PendingReinvite {
   bool glareRetried = false;
 
   _PendingReinvite(this.kind, [Completer<bool>? completer])
-      : completer = completer ?? Completer<bool>();
+    : completer = completer ?? Completer<bool>();
 
   void finish(bool ok) {
     if (!completer.isCompleted) completer.complete(ok);
@@ -204,6 +209,7 @@ class UdpSipClient {
   static const Duration _t2 = Duration(seconds: 4);
   static const Duration _txTimeout = Duration(seconds: 32);
   static const Duration _pendingInviteTtl = Duration(seconds: 120);
+
   /// RFC 5626 double-CRLF keep-alive.
   static const String _keepAlivePing = '\r\n\r\n';
   static const String _allow =
@@ -225,9 +231,9 @@ class UdpSipClient {
 
   /// Calls that are established, ringing out or on hold.
   Map<String, SipCall> get activeCalls => Map.unmodifiable({
-        for (final e in _dialogs.entries)
-          if (!e.value.terminating) e.key: e.value.call,
-      });
+    for (final e in _dialogs.entries)
+      if (!e.value.terminating) e.key: e.value.call,
+  });
 
   /// Call-IDs of incoming calls still ringing.
   List<String> get ringingCallIds => _pendingInvites.keys.toList();
@@ -237,7 +243,7 @@ class UdpSipClient {
 
   /// Fires when a new incoming call starts ringing.
   void Function(String callerNumber, String? callerName, String callId)?
-      onIncomingCall;
+  onIncomingCall;
 
   /// Fires on every call state change.
   void Function(String callId, SipCallEvent event)? onCallStateChanged;
@@ -259,19 +265,21 @@ class UdpSipClient {
     int localPort = 0,
     String? localIp,
     this.allowContactRewrite = false,
-  })  : _server = server,
-        _port = port,
-        _username = username,
-        _password = password,
-        _displayName = (displayName != null && displayName.isNotEmpty)
-            ? displayName
-            : username,
-        _authUsername = (authUsername != null && authUsername.isNotEmpty)
-            ? authUsername
-            : username,
-        _requestedExpires = expires,
-        _bindPort = localPort,
-        _forcedLocalIp = localIp;
+  }) : _server = server,
+       _port = port,
+       _username = username,
+       _password = password,
+       _displayName =
+           (displayName != null && displayName.isNotEmpty)
+               ? displayName
+               : username,
+       _authUsername =
+           (authUsername != null && authUsername.isNotEmpty)
+               ? authUsername
+               : username,
+       _requestedExpires = expires,
+       _bindPort = localPort,
+       _forcedLocalIp = localIp;
 
   // ── Connect / registration ─────────────────────────────────
 
@@ -284,11 +292,16 @@ class UdpSipClient {
       return;
     }
     try {
-      final addresses = await InternetAddress.lookup(_server,
-          type: InternetAddressType.IPv4);
+      final addresses = await InternetAddress.lookup(
+        _server,
+        type: InternetAddressType.IPv4,
+      );
       if (addresses.isEmpty) throw SocketException('Cannot resolve $_server');
       _serverAddress = addresses.first;
-      _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, _bindPort);
+      _socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        _bindPort,
+      );
       _sender = DatagramSender(_socket!);
       _localPort = _socket!.port;
       _localIp = _forcedLocalIp ?? await _detectLocalIp();
@@ -352,6 +365,7 @@ class UdpSipClient {
   String get _registrar =>
       _port == 5060 ? 'sip:$_server' : 'sip:$_server:$_port';
   String get _aor => 'sip:$_username@$_server';
+
   /// Host and port we advertise: the public ones after a contact rewrite.
   String get _sentByHost => _contactHost ?? _localIp ?? '0.0.0.0';
   int? get _sentByPort => _contactPort ?? _localPort;
@@ -379,14 +393,20 @@ class UdpSipClient {
     _w(b, 'User-Agent: $userAgent');
     if (challenge != null) {
       _regAuthCseq = _regCseq;
-      _w(b,
-          '${challenge.responseHeaderName}: ${challenge.authorize(method: 'REGISTER', uri: _registrar, username: _authUsername, password: _password)}');
+      _w(
+        b,
+        '${challenge.responseHeaderName}: ${challenge.authorize(method: 'REGISTER', uri: _registrar, username: _authUsername, password: _password)}',
+      );
     }
     _w(b, 'Content-Length: 0');
     _blank(b);
 
-    _startTransaction(branch, 'REGISTER', b.toString(),
-        onTimeout: _onRegisterTimeout);
+    _startTransaction(
+      branch,
+      'REGISTER',
+      b.toString(),
+      onTimeout: _onRegisterTimeout,
+    );
   }
 
   void _onRegisterResponse(SipMessage res, int code) {
@@ -396,14 +416,17 @@ class UdpSipClient {
 
     if (code == 401 || code == 407) {
       final challenge = DigestChallenge.pick(
-          res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
-          isProxy: code == 407);
+        res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
+        isProxy: code == 407,
+      );
       final hadAuth = _regAuthCseq == res.cseqNumber;
       if (challenge == null ||
           (hadAuth && !_regUsedCachedNonce && !challenge.stale)) {
-        _registrationFailed(challenge == null
-            ? 'Registration failed: unsupported authentication'
-            : 'Registration failed: authentication rejected, check username and password');
+        _registrationFailed(
+          challenge == null
+              ? 'Registration failed: unsupported authentication'
+              : 'Registration failed: authentication rejected, check username and password',
+        );
         return;
       }
       _regChallenge = challenge;
@@ -443,7 +466,8 @@ class UdpSipClient {
 
   void _onRegisterTimeout() {
     _registrationFailed(
-        'Registration timed out, no answer from $_server:$_port');
+      'Registration timed out, no answer from $_server:$_port',
+    );
   }
 
   void _registrationFailed(String message) {
@@ -502,8 +526,10 @@ class UdpSipClient {
     // us re-registering in a loop.
     if (_rewritesInARow >= 2) return false;
     _rewritesInARow++;
-    sipLog('[SIP] Contact rewrite: $_sentByHost:$_sentByPort -> '
-        '$host:$port, registering again');
+    sipLog(
+      '[SIP] Contact rewrite: $_sentByHost:$_sentByPort -> '
+      '$host:$port, registering again',
+    );
     _contactHost = host;
     _contactPort = port;
     _regUsedCachedNonce = _regChallenge != null;
@@ -596,10 +622,12 @@ class UdpSipClient {
       case 'CANCEL':
         _onCancel(req);
       case 'OPTIONS':
-        _respond(req, 200, 'OK', extraHeaders: [
-          'Allow: $_allow',
-          'Accept: application/sdp',
-        ]);
+        _respond(
+          req,
+          200,
+          'OK',
+          extraHeaders: ['Allow: $_allow', 'Accept: application/sdp'],
+        );
       case 'NOTIFY':
         _respond(req, 200, 'OK');
         _onNotify(req);
@@ -662,7 +690,9 @@ class UdpSipClient {
     }
     if (req.hasSdp && SdpInfo.parse(req.body).chooseCodec() == null) {
       _rememberRejected(
-          callId, _respond(req, 488, 'Not Acceptable Here', toTag: _newTag()));
+        callId,
+        _respond(req, 488, 'Not Acceptable Here', toTag: _newTag()),
+      );
       return;
     }
 
@@ -673,15 +703,23 @@ class UdpSipClient {
     final localTag = _newTag();
 
     _respond(req, 100, 'Trying');
-    final ringing = _buildResponse(req, 180, 'Ringing',
-        toTag: localTag, withContact: true, extraHeaders: ['Allow: $_allow']);
+    final ringing = _buildResponse(
+      req,
+      180,
+      'Ringing',
+      toTag: localTag,
+      withContact: true,
+      extraHeaders: ['Allow: $_allow'],
+    );
     final p = _PendingInvite(req, localTag, number, name)
       ..lastProvisional = ringing;
     p.ttl = Timer(_pendingInviteTtl, () {
       if (_pendingInvites.remove(callId) == null) return;
       sipLog('[SIP] Unanswered call $callId timed out');
-      _rememberRejected(callId,
-          _respond(req, 480, 'Temporarily Unavailable', toTag: localTag));
+      _rememberRejected(
+        callId,
+        _respond(req, 480, 'Temporarily Unavailable', toTag: localTag),
+      );
       _emit(callId, SipCallEvent.cancelled);
     });
     _pendingInvites[callId] = p;
@@ -707,8 +745,10 @@ class UdpSipClient {
     if (!_pendingInvites.containsKey(callId)) return; // cancelled meanwhile
     _removePending(callId);
     if (media != null && rtpPort == null) {
-      _rememberRejected(callId,
-          _respond(req, 500, 'Server Internal Error', toTag: p.localTag));
+      _rememberRejected(
+        callId,
+        _respond(req, 500, 'Server Internal Error', toTag: p.localTag),
+      );
       onError?.call('Failed to answer call: RTP socket could not be opened');
       _emit(callId, SipCallEvent.failed);
       return;
@@ -716,19 +756,20 @@ class UdpSipClient {
 
     final from = req.from ?? '';
     final contact = req.header('Contact');
-    final call = SipCall(
-      callId: callId,
-      fromHeader: stripTag(from),
-      toHeader: stripTag(req.to ?? ''),
-      contact: contact,
-      localTag: p.localTag,
-      remoteTag: extractTag(from),
-      isIncoming: true,
-      remoteNumber: p.number,
-      remoteName: p.name,
-    )
-      ..remoteTarget = contact != null ? extractUri(contact) : null
-      ..routeSet = req.headerValues('Record-Route');
+    final call =
+        SipCall(
+            callId: callId,
+            fromHeader: stripTag(from),
+            toHeader: stripTag(req.to ?? ''),
+            contact: contact,
+            localTag: p.localTag,
+            remoteTag: extractTag(from),
+            isIncoming: true,
+            remoteNumber: p.number,
+            remoteName: p.name,
+          )
+          ..remoteTarget = contact != null ? extractUri(contact) : null
+          ..routeSet = req.headerValues('Record-Route');
 
     var direction = MediaDirection.sendrecv;
     if (offer != null && codec != null) {
@@ -748,15 +789,24 @@ class UdpSipClient {
     final d = _Dialog(call)..initialRemoteCseq = req.cseqNumber;
     _dialogs[callId] = d;
 
-    final sdp = offer == null
-        ? _sdpFor(call)
-        : _sdpFor(call,
-            direction: direction, codec: codec, dtmf: offer.telephoneEvent);
-    final ok = _buildResponse(req, 200, 'OK',
-        toTag: p.localTag,
-        withContact: true,
-        extraHeaders: ['Allow: $_allow'],
-        body: sdp);
+    final sdp =
+        offer == null
+            ? _sdpFor(call)
+            : _sdpFor(
+              call,
+              direction: direction,
+              codec: codec,
+              dtmf: offer.telephoneEvent,
+            );
+    final ok = _buildResponse(
+      req,
+      200,
+      'OK',
+      toTag: p.localTag,
+      withContact: true,
+      extraHeaders: ['Allow: $_allow'],
+      body: sdp,
+    );
     d.initialOk = ok;
     _send(ok);
     _startOkRetransmit(callId, req.cseqNumber ?? 0, ok, initial: true);
@@ -823,19 +873,31 @@ class UdpSipClient {
         if (owns && !call.isOnHold) _focusAudio(call);
       }
       _refreshOtherLegs();
-      sdp = _sdpFor(call,
-          direction: direction, codec: codec, dtmf: offer.telephoneEvent);
+      sdp = _sdpFor(
+        call,
+        direction: direction,
+        codec: codec,
+        dtmf: offer.telephoneEvent,
+      );
     } else {
       // Re-INVITE without SDP (Asterisk sends these around transfers): we
       // offer here and the answer arrives in the ACK.
       call.answerExpectedInAck = true;
-      sdp = _sdpFor(call,
-          direction:
-              call.isOnHold ? MediaDirection.sendonly : MediaDirection.sendrecv);
+      sdp = _sdpFor(
+        call,
+        direction:
+            call.isOnHold ? MediaDirection.sendonly : MediaDirection.sendrecv,
+      );
     }
 
-    final ok = _buildResponse(req, 200, 'OK',
-        withContact: true, extraHeaders: ['Allow: $_allow'], body: sdp);
+    final ok = _buildResponse(
+      req,
+      200,
+      'OK',
+      withContact: true,
+      extraHeaders: ['Allow: $_allow'],
+      body: sdp,
+    );
     d.lastRemoteReinviteCseq = cseq;
     d.lastReinviteOk = ok;
     _send(ok);
@@ -866,8 +928,10 @@ class UdpSipClient {
       final p = _pendingInvites[callId];
       if (p != null) {
         _respond(req, 200, 'OK');
-        _rememberRejected(callId,
-            _respond(p.request, 487, 'Request Terminated', toTag: p.localTag));
+        _rememberRejected(
+          callId,
+          _respond(p.request, 487, 'Request Terminated', toTag: p.localTag),
+        );
         _removePending(callId);
         _emit(callId, SipCallEvent.cancelled);
         return;
@@ -898,8 +962,10 @@ class UdpSipClient {
     final p = _pendingInvites[callId];
     _respond(req, 200, 'OK', toTag: p?.localTag);
     if (p == null) return; // CANCEL after answer has no effect (9.2)
-    _rememberRejected(callId,
-        _respond(p.request, 487, 'Request Terminated', toTag: p.localTag));
+    _rememberRejected(
+      callId,
+      _respond(p.request, 487, 'Request Terminated', toTag: p.localTag),
+    );
     _removePending(callId);
     _emit(callId, SipCallEvent.cancelled);
   }
@@ -925,7 +991,9 @@ class UdpSipClient {
       hangupCall(callId);
     } else {
       sipLog('[SIP] Transfer of $callId failed ($frag)');
-      onError?.call('Transfer failed: ${frag.substring(min(8, frag.length)).trim()}');
+      onError?.call(
+        'Transfer failed: ${frag.substring(min(8, frag.length)).trim()}',
+      );
     }
   }
 
@@ -967,9 +1035,8 @@ class UdpSipClient {
     final branch = _newBranch();
     call.inviteBranch = branch;
     final uri = d.inviteRequestUri!;
-    final sdp = challenge == null
-        ? _sdpFor(call)
-        : _sdpFor(call, bumpVersion: false);
+    final sdp =
+        challenge == null ? _sdpFor(call) : _sdpFor(call, bumpVersion: false);
     final body = utf8.encode(sdp);
 
     final b = StringBuffer();
@@ -984,8 +1051,10 @@ class UdpSipClient {
     _w(b, 'Allow: $_allow');
     _w(b, 'User-Agent: $userAgent');
     if (challenge != null) {
-      _w(b,
-          '${challenge.responseHeaderName}: ${challenge.authorize(method: 'INVITE', uri: uri, username: _authUsername, password: _password)}');
+      _w(
+        b,
+        '${challenge.responseHeaderName}: ${challenge.authorize(method: 'INVITE', uri: uri, username: _authUsername, password: _password)}',
+      );
     }
     _w(b, 'Content-Type: application/sdp');
     _w(b, 'Content-Length: ${body.length}');
@@ -993,8 +1062,12 @@ class UdpSipClient {
     b.write(sdp);
 
     final callId = call.callId;
-    _startTransaction(branch, 'INVITE', b.toString(),
-        onTimeout: () => _onInviteTimeout(callId));
+    _startTransaction(
+      branch,
+      'INVITE',
+      b.toString(),
+      onTimeout: () => _onInviteTimeout(callId),
+    );
   }
 
   void _onInviteTimeout(String callId) {
@@ -1038,8 +1111,11 @@ class UdpSipClient {
 
     // Final failure: always ACK (17.1.1.3).
     if (isReinvite || call.isConfirmed) {
-      _sendNon2xxAck(res, call.remoteTarget ?? d.inviteRequestUri ?? _registrar,
-          call.routeSet);
+      _sendNon2xxAck(
+        res,
+        call.remoteTarget ?? d.inviteRequestUri ?? _registrar,
+        call.routeSet,
+      );
     } else {
       _sendNon2xxAck(res, d.inviteRequestUri ?? _registrar, const []);
     }
@@ -1048,8 +1124,9 @@ class UdpSipClient {
     if (code == 401 || code == 407) {
       d.authHandledCseqs.add(cseq);
       final challenge = DigestChallenge.pick(
-          res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
-          isProxy: code == 407);
+        res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
+        isProxy: code == 407,
+      );
       if (isReinvite) {
         if (challenge == null || reinvite.authAttempted || d.terminating) {
           _onReinviteFailed(d, res, code);
@@ -1090,8 +1167,7 @@ class UdpSipClient {
     if (!declined) {
       onError?.call('Call failed: $code ${res.reasonPhrase}');
     }
-    _endDialog(
-        callId, declined ? SipCallEvent.declined : SipCallEvent.failed);
+    _endDialog(callId, declined ? SipCallEvent.declined : SipCallEvent.failed);
   }
 
   void _onProvisional(_Dialog d, SipMessage res, int code) {
@@ -1116,8 +1192,7 @@ class UdpSipClient {
     }
   }
 
-  Future<void> _onInvite2xx(
-      _Dialog d, SipMessage res, bool isReinvite) async {
+  Future<void> _onInvite2xx(_Dialog d, SipMessage res, bool isReinvite) async {
     final call = d.call;
     final callId = call.callId;
     final cseq = res.cseqNumber ?? 0;
@@ -1204,7 +1279,9 @@ class UdpSipClient {
     final p = _pendingInvites[callId];
     if (p != null) {
       _rememberRejected(
-          callId, _respond(p.request, 486, 'Busy Here', toTag: p.localTag));
+        callId,
+        _respond(p.request, 486, 'Busy Here', toTag: p.localTag),
+      );
       _removePending(callId);
       _emit(callId, SipCallEvent.ended);
       return;
@@ -1316,15 +1393,21 @@ class UdpSipClient {
     return r.completer.future;
   }
 
-  void _sendReinvite(_Dialog d, _PendingReinvite r,
-      {DigestChallenge? challenge}) {
+  void _sendReinvite(
+    _Dialog d,
+    _PendingReinvite r, {
+    DigestChallenge? challenge,
+  }) {
     final call = d.call;
     call.dialogCseq++;
     r.cseq = call.dialogCseq;
-    r.sdp ??= _sdpFor(call,
-        direction: r.kind == _ReinviteKind.hold
-            ? MediaDirection.sendonly
-            : MediaDirection.sendrecv);
+    r.sdp ??= _sdpFor(
+      call,
+      direction:
+          r.kind == _ReinviteKind.hold
+              ? MediaDirection.sendonly
+              : MediaDirection.sendrecv,
+    );
     final sdp = r.sdp!;
     final body = utf8.encode(sdp);
     final uri = call.remoteTarget ?? _registrar;
@@ -1345,8 +1428,10 @@ class UdpSipClient {
     _w(b, 'Allow: $_allow');
     _w(b, 'User-Agent: $userAgent');
     if (challenge != null) {
-      _w(b,
-          '${challenge.responseHeaderName}: ${challenge.authorize(method: 'INVITE', uri: uri, username: _authUsername, password: _password)}');
+      _w(
+        b,
+        '${challenge.responseHeaderName}: ${challenge.authorize(method: 'INVITE', uri: uri, username: _authUsername, password: _password)}',
+      );
     }
     _w(b, 'Content-Type: application/sdp');
     _w(b, 'Content-Length: ${body.length}');
@@ -1354,11 +1439,16 @@ class UdpSipClient {
     b.write(sdp);
 
     final callId = call.callId;
-    _startTransaction(branch, 'INVITE', b.toString(), onTimeout: () {
-      final dd = _dialogs[callId];
-      if (dd == null || dd.reinvite != r) return;
-      _reinviteFailed(dd, r, 'no answer from the server');
-    });
+    _startTransaction(
+      branch,
+      'INVITE',
+      b.toString(),
+      onTimeout: () {
+        final dd = _dialogs[callId];
+        if (dd == null || dd.reinvite != r) return;
+        _reinviteFailed(dd, r, 'no answer from the server');
+      },
+    );
   }
 
   void _onReinviteFailed(_Dialog d, SipMessage res, int code) {
@@ -1426,10 +1516,11 @@ class UdpSipClient {
     d.transferring = true;
     final accepted = Completer<bool>();
     d.transferAccepted = accepted;
-    _sendInDialog(d, 'REFER', extraHeaders: [
-      'Refer-To: <${_targetUri(t)}>',
-      'Referred-By: <$_aor>',
-    ]);
+    _sendInDialog(
+      d,
+      'REFER',
+      extraHeaders: ['Refer-To: <${_targetUri(t)}>', 'Referred-By: <$_aor>'],
+    );
     d.transferTimer?.cancel();
     d.transferTimer = Timer(const Duration(seconds: 30), () {
       // Accepted but the server never reported back or hung up our leg:
@@ -1448,8 +1539,11 @@ class UdpSipClient {
   /// Send DTMF [digits] (0-9, *, #, A-D) on an established call. Uses RFC
   /// 4733 telephone-event packets when the far end supports them, SIP INFO
   /// otherwise.
-  Future<void> sendDtmf(String callId, String digits,
-      {int durationMs = 160}) async {
+  Future<void> sendDtmf(
+    String callId,
+    String digits, {
+    int durationMs = 160,
+  }) async {
     for (final digit in digits.toUpperCase().split('')) {
       if (!RegExp(r'^[0-9*#A-D]$').hasMatch(digit)) continue;
       final d = _dialogs[callId];
@@ -1457,15 +1551,19 @@ class UdpSipClient {
         onError?.call('No established call to send DTMF on');
         return;
       }
-      final rtp = d.call.dtmfPayloadType != null &&
+      final rtp =
+          d.call.dtmfPayloadType != null &&
           media != null &&
           _audioOwnerCallId == callId;
       if (rtp) {
         await media!.sendDtmf(digit, durationMs: durationMs);
       } else {
-        _sendInDialog(d, 'INFO',
-            body: 'Signal=$digit\r\nDuration=$durationMs\r\n',
-            contentType: 'application/dtmf-relay');
+        _sendInDialog(
+          d,
+          'INFO',
+          body: 'Signal=$digit\r\nDuration=$durationMs\r\n',
+          contentType: 'application/dtmf-relay',
+        );
         await Future<void>.delayed(Duration(milliseconds: durationMs));
       }
       await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -1474,13 +1572,18 @@ class UdpSipClient {
 
   // ── In-dialog requests (BYE, REFER, INFO) ──────────────────
 
-  void _sendInDialog(_Dialog d, String method,
-      {List<String> extraHeaders = const [],
-      String? body,
-      String? contentType,
-      DigestChallenge? challenge}) {
+  void _sendInDialog(
+    _Dialog d,
+    String method, {
+    List<String> extraHeaders = const [],
+    String? body,
+    String? contentType,
+    DigestChallenge? challenge,
+  }) {
     final request =
-        challenge == null ? _InDialogRequest(extraHeaders, body, contentType) : d.requests[method]!;
+        challenge == null
+            ? _InDialogRequest(extraHeaders, body, contentType)
+            : d.requests[method]!;
     d.requests[method] = request;
     final call = d.call;
     call.dialogCseq++;
@@ -1506,8 +1609,10 @@ class UdpSipClient {
     }
     _w(b, 'User-Agent: $userAgent');
     if (challenge != null) {
-      _w(b,
-          '${challenge.responseHeaderName}: ${challenge.authorize(method: method, uri: uri, username: _authUsername, password: _password, body: request.body ?? '')}');
+      _w(
+        b,
+        '${challenge.responseHeaderName}: ${challenge.authorize(method: method, uri: uri, username: _authUsername, password: _password, body: request.body ?? '')}',
+      );
     }
     if (bytes != null) {
       _w(b, 'Content-Type: ${request.contentType}');
@@ -1520,21 +1625,26 @@ class UdpSipClient {
     }
 
     final callId = call.callId;
-    _startTransaction(branch, method, b.toString(), onTimeout: () {
-      if (method == 'BYE') {
-        _finishDialog(callId);
-      } else if (method == 'REFER') {
-        final dd = _dialogs[callId];
-        if (dd != null && dd.transferring) {
-          dd.transferring = false;
-          dd.transferTimer?.cancel();
-          if (!(dd.transferAccepted?.isCompleted ?? true)) {
-            dd.transferAccepted!.complete(false);
+    _startTransaction(
+      branch,
+      method,
+      b.toString(),
+      onTimeout: () {
+        if (method == 'BYE') {
+          _finishDialog(callId);
+        } else if (method == 'REFER') {
+          final dd = _dialogs[callId];
+          if (dd != null && dd.transferring) {
+            dd.transferring = false;
+            dd.transferTimer?.cancel();
+            if (!(dd.transferAccepted?.isCompleted ?? true)) {
+              dd.transferAccepted!.complete(false);
+            }
+            onError?.call('Transfer failed: no answer from the server');
           }
-          onError?.call('Transfer failed: no answer from the server');
         }
-      }
-    });
+      },
+    );
   }
 
   void _onInDialogResponse(SipMessage res, int code, String method) {
@@ -1548,8 +1658,9 @@ class UdpSipClient {
 
     if ((code == 401 || code == 407) && !request.authAttempted) {
       final challenge = DigestChallenge.pick(
-          res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
-          isProxy: code == 407);
+        res.headerAll(code == 407 ? 'Proxy-Authenticate' : 'WWW-Authenticate'),
+        isProxy: code == 407,
+      );
       if (challenge != null) {
         request.authAttempted = true;
         _sendInDialog(d, method, challenge: challenge);
@@ -1563,7 +1674,9 @@ class UdpSipClient {
       case 'REFER':
         final accepted = d.transferAccepted;
         if (code < 300) {
-          if (accepted != null && !accepted.isCompleted) accepted.complete(true);
+          if (accepted != null && !accepted.isCompleted) {
+            accepted.complete(true);
+          }
         } else {
           d.transferring = false;
           d.transferTimer?.cancel();
@@ -1571,7 +1684,8 @@ class UdpSipClient {
             accepted.complete(false);
           }
           onError?.call(
-              'Transfer refused by the server: $code ${res.reasonPhrase}');
+            'Transfer refused by the server: $code ${res.reasonPhrase}',
+          );
         }
       case 'INFO':
         if (code >= 300) {
@@ -1628,7 +1742,8 @@ class UdpSipClient {
   /// A 2xx for a call we already forgot: ACK it and hang up.
   void _orphanAckAndBye(SipMessage res) {
     final contact = res.header('Contact');
-    final target = (contact != null ? extractUri(contact) : null) ??
+    final target =
+        (contact != null ? extractUri(contact) : null) ??
         extractUri(res.to ?? '') ??
         _registrar;
     final routes = res.headerValues('Record-Route').reversed.toList();
@@ -1654,11 +1769,13 @@ class UdpSipClient {
 
   // ── Media ──────────────────────────────────────────────────
 
-  String _sdpFor(SipCall call,
-      {MediaDirection direction = MediaDirection.sendrecv,
-      int? codec,
-      int? dtmf,
-      bool bumpVersion = true}) {
+  String _sdpFor(
+    SipCall call, {
+    MediaDirection direction = MediaDirection.sendrecv,
+    int? codec,
+    int? dtmf,
+    bool bumpVersion = true,
+  }) {
     if (bumpVersion) call.sdpVersion++;
     return buildSdp(
       localIp: _sentByHost,
@@ -1697,8 +1814,12 @@ class UdpSipClient {
     final host = call.remoteRtpHost;
     final port = call.remoteRtpPort;
     if (host == null || port == null || port == 0) return;
-    media?.setRemote(host, port,
-        payloadType: call.payloadType, dtmfPayloadType: call.dtmfPayloadType);
+    media?.setRemote(
+      host,
+      port,
+      payloadType: call.payloadType,
+      dtmfPayloadType: call.dtmfPayloadType,
+    );
   }
 
   /// Tell the RTP receiver which endpoints belong to the other calls, so a
@@ -1720,7 +1841,8 @@ class UdpSipClient {
       final ok = await m.startMicrophone();
       if (!ok) {
         onError?.call(
-            'Microphone failed to start, the other side cannot hear you');
+          'Microphone failed to start, the other side cannot hear you',
+        );
       }
     } catch (e) {
       onError?.call('Microphone failed to start: $e');
@@ -1730,8 +1852,9 @@ class UdpSipClient {
   /// Release audio only as far as [callId] owns it. The RTP socket and
   /// microphone are shared, ending one call must not silence the others.
   void _releaseAudioFor(String callId) {
-    final othersRemain = _dialogs.values
-        .any((d) => d.call.callId != callId && !d.terminating);
+    final othersRemain = _dialogs.values.any(
+      (d) => d.call.callId != callId && !d.terminating,
+    );
     if (!othersRemain) {
       try {
         media?.release();
@@ -1789,18 +1912,31 @@ class UdpSipClient {
   void _emit(String callId, SipCallEvent event) {
     if (event.isTerminal) {
       if (!_terminalNotified.add(callId)) return;
-      _later(const Duration(minutes: 2), () => _terminalNotified.remove(callId));
+      _later(
+        const Duration(minutes: 2),
+        () => _terminalNotified.remove(callId),
+      );
     }
     onCallStateChanged?.call(callId, event);
   }
 
   // ── Transactions and retransmissions ───────────────────────
 
-  void _startTransaction(String branch, String method, String message,
-      {void Function()? onTimeout}) {
+  void _startTransaction(
+    String branch,
+    String method,
+    String message, {
+    void Function()? onTimeout,
+  }) {
     final key = '$branch:$method';
     _transactions.remove(key)?.timer?.cancel();
-    final tx = _ClientTransaction(key, message, method == 'INVITE', onTimeout, _t1);
+    final tx = _ClientTransaction(
+      key,
+      message,
+      method == 'INVITE',
+      onTimeout,
+      _t1,
+    );
     _transactions[key] = tx;
     _send(message);
     _armTransaction(tx);
@@ -1838,8 +1974,12 @@ class UdpSipClient {
     _transactions.remove(key);
   }
 
-  void _startOkRetransmit(String callId, int cseq, String message,
-      {bool initial = false}) {
+  void _startOkRetransmit(
+    String callId,
+    int cseq,
+    String message, {
+    bool initial = false,
+  }) {
     final key = '$callId:$cseq';
     _okRetransmits.remove(key)?.timer?.cancel();
     final ok = _OkRetransmit(message, initial, _t1);
@@ -1985,19 +2125,33 @@ class UdpSipClient {
   // ── Responses ──────────────────────────────────────────────
 
   /// Build and send a response to [req]. Returns the raw message.
-  String _respond(SipMessage req, int code, String reason,
-      {String? toTag, List<String> extraHeaders = const []}) {
-    final msg =
-        _buildResponse(req, code, reason, toTag: toTag, extraHeaders: extraHeaders);
+  String _respond(
+    SipMessage req,
+    int code,
+    String reason, {
+    String? toTag,
+    List<String> extraHeaders = const [],
+  }) {
+    final msg = _buildResponse(
+      req,
+      code,
+      reason,
+      toTag: toTag,
+      extraHeaders: extraHeaders,
+    );
     _send(msg);
     return msg;
   }
 
-  String _buildResponse(SipMessage req, int code, String reason,
-      {String? toTag,
-      bool withContact = false,
-      List<String> extraHeaders = const [],
-      String? body}) {
+  String _buildResponse(
+    SipMessage req,
+    int code,
+    String reason, {
+    String? toTag,
+    bool withContact = false,
+    List<String> extraHeaders = const [],
+    String? body,
+  }) {
     final b = StringBuffer();
     _w(b, 'SIP/2.0 $code $reason');
     for (final via in req.headerAll('Via')) {
@@ -2065,8 +2219,11 @@ class UdpSipClient {
       sipLog('[SIP] Not sent, socket closed: ${message.split('\r\n').first}');
       return;
     }
-    _trace(retransmit ? '>>> (again)' : '>>>', message,
-        message.split('\r\n').first);
+    _trace(
+      retransmit ? '>>> (again)' : '>>>',
+      message,
+      message.split('\r\n').first,
+    );
     sender.send(utf8.encode(message), a, _port);
   }
 
@@ -2077,9 +2234,13 @@ class UdpSipClient {
       return;
     }
     final masked = message.replaceAll(
-        RegExp(r'^((?:Proxy-)?Authorization:).*$',
-            multiLine: true, caseSensitive: false),
-        r'$1 <hidden>');
+      RegExp(
+        r'^((?:Proxy-)?Authorization:).*$',
+        multiLine: true,
+        caseSensitive: false,
+      ),
+      r'$1 <hidden>',
+    );
     sipLog('[SIP] $direction\n$masked');
   }
 
@@ -2102,8 +2263,11 @@ class UdpSipClient {
   Future<String> _detectLocalIp() async {
     // 1. TCP connect: the OS picks the route and reports the local address.
     try {
-      final tcp = await Socket.connect(_serverAddress, _port,
-          timeout: const Duration(milliseconds: 1500));
+      final tcp = await Socket.connect(
+        _serverAddress,
+        _port,
+        timeout: const Duration(milliseconds: 1500),
+      );
       final ip = tcp.address.address;
       tcp.destroy();
       if (ip != '0.0.0.0') {
@@ -2140,16 +2304,32 @@ class UdpSipClient {
     //    virtual adapters last.
     int rank(String name) {
       final n = name.toLowerCase();
-      const virtual = ['vethernet', 'virtual', 'vmware', 'vbox', 'docker',
-          'hyper-v', 'wsl', 'loopback', 'tailscale', 'zerotier'];
+      const virtual = [
+        'vethernet',
+        'virtual',
+        'vmware',
+        'vbox',
+        'docker',
+        'hyper-v',
+        'wsl',
+        'loopback',
+        'tailscale',
+        'zerotier',
+      ];
       if (virtual.any(n.contains)) return 5;
-      if (n.startsWith('wlan') || n.startsWith('en0') || n.contains('wi-fi') ||
-          n.contains('wifi') || n.startsWith('eth') || n.contains('ethernet') ||
+      if (n.startsWith('wlan') ||
+          n.startsWith('en0') ||
+          n.contains('wi-fi') ||
+          n.contains('wifi') ||
+          n.startsWith('eth') ||
+          n.contains('ethernet') ||
           n.startsWith('en')) {
         return 0;
       }
-      if (n.startsWith('rmnet') || n.startsWith('pdp_ip') ||
-          n.startsWith('ccmni') || n.startsWith('v4-')) {
+      if (n.startsWith('rmnet') ||
+          n.startsWith('pdp_ip') ||
+          n.startsWith('ccmni') ||
+          n.startsWith('v4-')) {
         return 1;
       }
       return 2;

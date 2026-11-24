@@ -7,11 +7,11 @@ import '../platform/audio_platform_registry.dart';
 
 /// Available ring tone styles
 enum RingTone {
-  chime,       // Ascending three-note chime (C5->E5->G5)
-  classic,     // Traditional phone ring
-  soft,        // Gentle two-note
-  alert,       // Urgent fast beeps
-  melody,      // Short musical phrase
+  chime, // Ascending three-note chime (C5->E5->G5)
+  classic, // Traditional phone ring
+  soft, // Gentle two-note
+  alert, // Urgent fast beeps
+  melody, // Short musical phrase
 }
 
 /// Generates and plays ringing, ringback, DTMF, and voice audio.
@@ -92,7 +92,9 @@ class SoundService {
       for (int i = 0; i < devices.length; i++) {
         sipLog('[SipSound]   [$i] ${devices[i]}');
       }
-      sipLog('[SipSound]   Selected: $_outputDeviceId (${_outputDeviceId == defaultAudioDeviceId ? "default" : _outputDeviceId.toString()})');
+      sipLog(
+        '[SipSound]   Selected: $_outputDeviceId (${_outputDeviceId == defaultAudioDeviceId ? "default" : _outputDeviceId.toString()})',
+      );
     } catch (_) {}
 
     _ringTones[RingTone.chime] = _buildChimeRing();
@@ -132,7 +134,9 @@ class SoundService {
         deviceName = 'UNKNOWN (index $_outputDeviceId)';
       }
     }
-    sipLog('[SipSound] Player opened: $_numBufs x $_bufSize bytes, device=$_outputDeviceId ($deviceName)');
+    sipLog(
+      '[SipSound] Player opened: $_numBufs x $_bufSize bytes, device=$_outputDeviceId ($deviceName)',
+    );
   }
 
   void setOutputDevice(int deviceId) {
@@ -166,7 +170,8 @@ class SoundService {
   void startRinging() {
     if (_player == null || _isRinging) return;
     _isRinging = true;
-    final toneData = _ringTones[_selectedRingTone] ?? _ringTones[RingTone.chime]!;
+    final toneData =
+        _ringTones[_selectedRingTone] ?? _ringTones[RingTone.chime]!;
     _player!.write(toneData);
     _ringTimer = Timer.periodic(const Duration(milliseconds: 3000), (_) {
       if (_isRinging && _player != null) {
@@ -273,7 +278,9 @@ class SoundService {
     _voicePlaying = true;
     _voiceWriteCount = 0;
     if (voiceStartBeep) _player?.write(_voiceStartTone);
-    sipLog('[SipSound] Voice started, device=$_outputDeviceId, freeBufs=${_player?.freeBufferCount ?? 0}/$_numBufs');
+    sipLog(
+      '[SipSound] Voice started, device=$_outputDeviceId, freeBufs=${_player?.freeBufferCount ?? 0}/$_numBufs',
+    );
   }
 
   /// Reopen the player for voice, handling Bluetooth A2DP→HFP profile switch.
@@ -288,15 +295,19 @@ class SoundService {
 
     // Check if selected device is a Bluetooth A2DP (Stereo) device
     // If so, find and use the corresponding Hands-Free device instead
-    if (_outputDeviceId != defaultAudioDeviceId && _outputDeviceId < devices.length) {
+    if (_outputDeviceId != defaultAudioDeviceId &&
+        _outputDeviceId < devices.length) {
       final selectedName = devices[_outputDeviceId].toLowerCase();
       if (selectedName.contains('stereo')) {
         // Find the Hands-Free variant of the same device
         for (int i = 0; i < devices.length; i++) {
           final name = devices[i].toLowerCase();
-          if (i != _outputDeviceId && name.contains('hands-free') &&
+          if (i != _outputDeviceId &&
+              name.contains('hands-free') &&
               _sharesBluetoothDevice(selectedName, name)) {
-            sipLog('[SipSound] BT A2DP→HFP switch: using device $i (${devices[i]}) instead of $_outputDeviceId (${devices[_outputDeviceId]})');
+            sipLog(
+              '[SipSound] BT A2DP→HFP switch: using device $i (${devices[i]}) instead of $_outputDeviceId (${devices[_outputDeviceId]})',
+            );
             _player = AudioPlatform.instance.createPlayer(
               numBuffers: _numBufs,
               bufferSize: _bufSize,
@@ -337,7 +348,9 @@ class SoundService {
       );
       if (_player!.open()) {
         _player!.setMaxVolume();
-        sipLog('[SipSound] Voice player opened on selected device=$_outputDeviceId');
+        sipLog(
+          '[SipSound] Voice player opened on selected device=$_outputDeviceId',
+        );
         return;
       }
     }
@@ -355,7 +368,10 @@ class SoundService {
     final words2 = name2.split(RegExp(r'[\s\(\)\-]+'));
     int shared = 0;
     for (final w in words1) {
-      if (w.length >= 3 && w != 'stereo' && w != 'hands' && w != 'free' &&
+      if (w.length >= 3 &&
+          w != 'stereo' &&
+          w != 'hands' &&
+          w != 'free' &&
           words2.contains(w)) {
         shared++;
       }
@@ -396,7 +412,9 @@ class SoundService {
           final s = bd.getInt16(i, Endian.little).abs();
           if (s > maxAbs) maxAbs = s;
         }
-        sipLog('[SipSound] Voice #$_voiceWriteCount, ${merged.length}B, maxAmp=$maxAbs/32768, gain=${_outputGain.toStringAsFixed(1)}x, wrote=$wrote, freeBufs=$freeBefore→${_player!.freeBufferCount}/$_numBufs, dev=$_outputDeviceId');
+        sipLog(
+          '[SipSound] Voice #$_voiceWriteCount, ${merged.length}B, maxAmp=$maxAbs/32768, gain=${_outputGain.toStringAsFixed(1)}x, wrote=$wrote, freeBufs=$freeBefore→${_player!.freeBufferCount}/$_numBufs, dev=$_outputDeviceId',
+        );
       }
     }
   }
@@ -529,7 +547,7 @@ class SoundService {
 
       final sample =
           (sin(2 * pi * freq * t) * 0.8 + sin(2 * pi * freq * 2 * t) * 0.2) *
-              env;
+          env;
       final pcm = (sample * 32767).round().clamp(-32768, 32767);
       bd.setInt16(i * 2, pcm, Endian.little);
     }
@@ -537,8 +555,12 @@ class SoundService {
     return data;
   }
 
-  Uint8List _dualTone(double freq1, double freq2, double durationMs,
-      {double amplitude = 0.35}) {
+  Uint8List _dualTone(
+    double freq1,
+    double freq2,
+    double durationMs, {
+    double amplitude = 0.35,
+  }) {
     final numSamples = (_sampleRate * durationMs / 1000).round();
     final data = Uint8List(numSamples * 2);
     final bd = ByteData.sublistView(data);
@@ -556,9 +578,8 @@ class SoundService {
         env *= (numSamples - i) / releaseSamples;
       }
 
-      final sample = (sin(2 * pi * freq1 * t) * 0.5 +
-              sin(2 * pi * freq2 * t) * 0.5) *
-          env;
+      final sample =
+          (sin(2 * pi * freq1 * t) * 0.5 + sin(2 * pi * freq2 * t) * 0.5) * env;
       final pcm = (sample * 32767).round().clamp(-32768, 32767);
       bd.setInt16(i * 2, pcm, Endian.little);
     }

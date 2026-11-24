@@ -32,7 +32,8 @@ void main() {
     });
 
     test('header names are case-insensitive and compact forms work', () {
-      final raw = 'SIP/2.0 200 OK\r\n'
+      final raw =
+          'SIP/2.0 200 OK\r\n'
           'v: SIP/2.0/UDP 1.2.3.4;branch=z9hG4bKx\r\n'
           'f: <sip:a@b>;tag=1\r\n'
           't: <sip:c@d>;tag=2\r\n'
@@ -52,10 +53,13 @@ void main() {
     });
 
     test('folded header lines are joined', () {
-      final m = SipMessage.parse('OPTIONS sip:a@b SIP/2.0\r\n'
-          'Subject: hello\r\n'
-          '  world\r\n'
-          'Call-ID: 1\r\n\r\n')!;
+      final m =
+          SipMessage.parse(
+            'OPTIONS sip:a@b SIP/2.0\r\n'
+            'Subject: hello\r\n'
+            '  world\r\n'
+            'Call-ID: 1\r\n\r\n',
+          )!;
       expect(m.header('Subject'), 'hello world');
     });
 
@@ -66,17 +70,25 @@ void main() {
     });
 
     test('leading blank lines before a message are skipped', () {
-      final m = SipMessage.parse('\r\n\r\nBYE sip:a@b SIP/2.0\r\nCall-ID: 9\r\n\r\n');
+      final m = SipMessage.parse(
+        '\r\n\r\nBYE sip:a@b SIP/2.0\r\nCall-ID: 9\r\n\r\n',
+      );
       expect(m?.method, 'BYE');
     });
 
     test('comma separated header values are split, URIs stay whole', () {
-      final m = SipMessage.parse('SIP/2.0 200 OK\r\n'
-          'Record-Route: <sip:p1;lr>, <sip:p2;lr>\r\n'
-          'Record-Route: <sip:p3;lr>\r\n'
-          'Contact: "A, B" <sip:x@y>\r\n\r\n')!;
-      expect(m.headerValues('Record-Route'),
-          ['<sip:p1;lr>', '<sip:p2;lr>', '<sip:p3;lr>']);
+      final m =
+          SipMessage.parse(
+            'SIP/2.0 200 OK\r\n'
+            'Record-Route: <sip:p1;lr>, <sip:p2;lr>\r\n'
+            'Record-Route: <sip:p3;lr>\r\n'
+            'Contact: "A, B" <sip:x@y>\r\n\r\n',
+          )!;
+      expect(m.headerValues('Record-Route'), [
+        '<sip:p1;lr>',
+        '<sip:p2;lr>',
+        '<sip:p3;lr>',
+      ]);
       expect(m.headerValues('Contact'), ['"A, B" <sip:x@y>']);
     });
   });
@@ -90,8 +102,10 @@ void main() {
     });
 
     test('uris, users and display names', () {
-      expect(extractUri('"A" <sip:1001@pbx:5060;transport=udp>;tag=1'),
-          'sip:1001@pbx:5060;transport=udp');
+      expect(
+        extractUri('"A" <sip:1001@pbx:5060;transport=udp>;tag=1'),
+        'sip:1001@pbx:5060;transport=udp',
+      );
       expect(extractUri('sip:1001@pbx;tag=1'), 'sip:1001@pbx');
       expect(extractUser('"A" <sip:1001@pbx>'), '1001');
       expect(extractUser('<sip:%2B30210@pbx>'), '+30210');
@@ -102,7 +116,8 @@ void main() {
     });
 
     test('parameters', () {
-      const via = 'SIP/2.0/UDP 10.0.0.2:5062;rport=40000;received=1.2.3.4;branch=z9hG4bKq';
+      const via =
+          'SIP/2.0/UDP 10.0.0.2:5062;rport=40000;received=1.2.3.4;branch=z9hG4bKq';
       expect(headerParam(via, 'branch'), 'z9hG4bKq');
       expect(headerParam(via, 'received'), '1.2.3.4');
       expect(headerParam(via, 'rport'), '40000');

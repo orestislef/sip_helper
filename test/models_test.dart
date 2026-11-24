@@ -79,10 +79,7 @@ void main() {
     });
 
     test('displayName prefers callerName', () {
-      final call = CallInfo(
-        callerNumber: '1002',
-        callerName: 'John',
-      );
+      final call = CallInfo(callerNumber: '1002', callerName: 'John');
       expect(call.displayName, 'John');
     });
 

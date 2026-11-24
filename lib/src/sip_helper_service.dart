@@ -110,8 +110,11 @@ class SipHelper {
 
   /// Set up the account. Calling it again with a new configuration
   /// un-registers the previous account first.
-  Future<void> initialize(SipConfiguration config,
-      {bool? autoTones, bool? autoHoldOtherCalls}) async {
+  Future<void> initialize(
+    SipConfiguration config, {
+    bool? autoTones,
+    bool? autoHoldOtherCalls,
+  }) async {
     try {
       if (autoTones != null) this.autoTones = autoTones;
       if (autoHoldOtherCalls != null) {
@@ -157,8 +160,10 @@ class SipHelper {
       _wireAudio();
       SoundService.instance.initialize();
       await AudioPlayerService.instance.initialize();
-      sipLog('[SipHelper] Initialized for ${config.username}@'
-          '${config.server}:${config.port}');
+      sipLog(
+        '[SipHelper] Initialized for ${config.username}@'
+        '${config.server}:${config.port}',
+      );
     } catch (e) {
       _add(_errorController, 'Failed to initialize SIP: $e');
       rethrow;
@@ -169,11 +174,15 @@ class SipHelper {
     if (_audioWired) return;
     _audioWired = true;
     RtpSession.instance.onRtpPayload = (Uint8List payload, int payloadType) {
-      AudioPlayerService.instance
-          .processAudioPacket(payload, payloadType: payloadType);
+      AudioPlayerService.instance.processAudioPacket(
+        payload,
+        payloadType: payloadType,
+      );
     };
-    MicrophoneService.instance.onAudioCaptured =
-        (Uint8List encoded, int payloadType) {
+    MicrophoneService.instance.onAudioCaptured = (
+      Uint8List encoded,
+      int payloadType,
+    ) {
       RtpSession.instance.sendAudio(encoded, payloadType);
     };
     MicrophoneService.instance.onRawAudioCaptured = (Uint8List pcm16) {
@@ -338,8 +347,10 @@ class SipHelper {
     final session = AudioPlatform.instance.session;
     final granted = await session.requestMicrophonePermission();
     if (!granted) {
-      _add(_errorController,
-          'Microphone permission denied, the other side will not hear you');
+      _add(
+        _errorController,
+        'Microphone permission denied, the other side will not hear you',
+      );
     }
     if (!_sessionActive) {
       _sessionActive = true;
@@ -348,10 +359,12 @@ class SipHelper {
   }
 
   Future<void> _deactivateIfIdle() async {
-    final busy = _calls.values.any((c) =>
-        c.state != CallState.ended &&
-        !(c.direction == CallDirection.incoming &&
-            c.state == CallState.ringing));
+    final busy = _calls.values.any(
+      (c) =>
+          c.state != CallState.ended &&
+          !(c.direction == CallDirection.incoming &&
+              c.state == CallState.ringing),
+    );
     if (busy || !_sessionActive) return;
     _sessionActive = false;
     MicrophoneService.instance.setMuted(false);
@@ -368,16 +381,21 @@ class SipHelper {
       }
       final ok = await client.holdCall(entry.key);
       if (!ok) {
-        _add(_errorController,
-            'Could not put ${call.remoteNumber} on hold, it is still live');
+        _add(
+          _errorController,
+          'Could not put ${call.remoteNumber} on hold, it is still live',
+        );
       }
     }
   }
 
   void _onIncomingCall(String number, String? name, String callId) {
-    final busy = _calls.values.any((c) =>
-        c.state == CallState.active || c.state == CallState.onHold ||
-        c.direction == CallDirection.outgoing);
+    final busy = _calls.values.any(
+      (c) =>
+          c.state == CallState.active ||
+          c.state == CallState.onHold ||
+          c.direction == CallDirection.outgoing,
+    );
     final info = CallInfo(
       callerNumber: number,
       callerName: name,
@@ -436,9 +454,11 @@ class SipHelper {
           if (call?.direction == CallDirection.outgoing) {
             SoundService.instance.stopRingback();
           }
-          final stillRinging = _calls.values.any((c) =>
-              c.direction == CallDirection.incoming &&
-              c.state == CallState.ringing);
+          final stillRinging = _calls.values.any(
+            (c) =>
+                c.direction == CallDirection.incoming &&
+                c.state == CallState.ringing,
+          );
           if (!stillRinging) SoundService.instance.stopRinging();
         }
         _deactivateIfIdle();
@@ -485,8 +505,12 @@ class _DefaultMedia implements SipMediaHandler {
   int? get localPort => _rtp.localPort;
 
   @override
-  void setRemote(String host, int port,
-      {required int payloadType, int? dtmfPayloadType}) {
+  void setRemote(
+    String host,
+    int port, {
+    required int payloadType,
+    int? dtmfPayloadType,
+  }) {
     _rtp.sendPayloadType = payloadType;
     _rtp.dtmfPayloadType = dtmfPayloadType;
     MicrophoneService.instance.payloadType = payloadType;

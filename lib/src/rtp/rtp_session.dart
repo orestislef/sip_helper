@@ -79,21 +79,18 @@ class RtpSession {
       _marker = true;
       sipLog('[RTP] Socket bound to port $_localRtpPort');
 
-      _rtpSocket!.listen(
-        (event) {
-          if (event == RawSocketEvent.write) {
-            _sender?.onWrite();
-            return;
-          }
-          if (event != RawSocketEvent.read) return;
-          try {
-            _handleIncoming();
-          } catch (e) {
-            if (_rxCount % 100 == 0) sipLog('[RTP] Receive error: $e');
-          }
-        },
-        onError: (Object error) => sipLog('[RTP] Socket error: $error'),
-      );
+      _rtpSocket!.listen((event) {
+        if (event == RawSocketEvent.write) {
+          _sender?.onWrite();
+          return;
+        }
+        if (event != RawSocketEvent.read) return;
+        try {
+          _handleIncoming();
+        } catch (e) {
+          if (_rxCount % 100 == 0) sipLog('[RTP] Receive error: $e');
+        }
+      }, onError: (Object error) => sipLog('[RTP] Socket error: $error'));
 
       _isActive = true;
       _rxCount = 0;
@@ -109,18 +106,23 @@ class RtpSession {
   int? get localPort => _localRtpPort;
 
   /// Where audio is sent (`host:port`), or null.
-  String? get remoteEndpoint => _remoteHost == null || _remotePort == null
-      ? null
-      : '$_remoteHost:$_remotePort';
+  String? get remoteEndpoint =>
+      _remoteHost == null || _remotePort == null
+          ? null
+          : '$_remoteHost:$_remotePort';
 
   void setRemoteEndpoint(String host, int port) {
     _remoteHost = host;
     _remotePort = port;
     _remoteAddress = InternetAddress.tryParse(host);
     if (_remoteAddress == null) {
-      InternetAddress.lookup(host).then((list) {
-        if (list.isNotEmpty && _remoteHost == host) _remoteAddress = list.first;
-      }).catchError((Object _) {});
+      InternetAddress.lookup(host)
+          .then((list) {
+            if (list.isNotEmpty && _remoteHost == host) {
+              _remoteAddress = list.first;
+            }
+          })
+          .catchError((Object _) {});
     }
     // Fresh focus: the announced endpoint gets its chance before latching.
     _lastFromFocused = DateTime.now();
@@ -147,8 +149,10 @@ class RtpSession {
         if (!_maybeLatch(from, datagram.address, datagram.port)) {
           _rxDropped++;
           if (_rxDropped <= 3 || _rxDropped % 500 == 0) {
-            sipLog('[RTP] Dropped packet #$_rxDropped from $from '
-                '(focused on $_remoteHost:$_remotePort)');
+            sipLog(
+              '[RTP] Dropped packet #$_rxDropped from $from '
+              '(focused on $_remoteHost:$_remotePort)',
+            );
           }
           return;
         }
@@ -160,8 +164,10 @@ class RtpSession {
     final data = datagram.data;
     _rxCount++;
     if (_rxCount <= 3 || _rxCount % 500 == 0) {
-      sipLog('[RTP] Received packet #$_rxCount, ${data.length} bytes from '
-          '${datagram.address.address}:${datagram.port}');
+      sipLog(
+        '[RTP] Received packet #$_rxCount, ${data.length} bytes from '
+        '${datagram.address.address}:${datagram.port}',
+      );
     }
     if (data.length < 12 || (data[0] >> 6) != 2) return;
 
@@ -185,8 +191,11 @@ class RtpSession {
     if (payloadLength <= 0 || headerLength + payloadLength > data.length) {
       return;
     }
-    final payload =
-        Uint8List.sublistView(data, headerLength, headerLength + payloadLength);
+    final payload = Uint8List.sublistView(
+      data,
+      headerLength,
+      headerLength + payloadLength,
+    );
     onRtpPayload?.call(payload, payloadType);
     if (payloadType == 0 || payloadType == 8) onAudioReceived?.call(payload);
   }
@@ -207,8 +216,10 @@ class RtpSession {
     }
     _candidateCount++;
     if (_candidateCount < 8) return false;
-    sipLog('[RTP] Latched onto $from, the announced '
-        '$_remoteHost:$_remotePort sent nothing');
+    sipLog(
+      '[RTP] Latched onto $from, the announced '
+      '$_remoteHost:$_remotePort sent nothing',
+    );
     _remoteHost = address.address;
     _remotePort = port;
     _remoteAddress = address;
@@ -251,8 +262,12 @@ class RtpSession {
       const volume = 10;
       for (var i = 1; i <= steps; i++) {
         final duration = i * 160;
-        _sendPacket(_dtmfPayload(event, false, volume, duration), pt, start,
-            marker: i == 1);
+        _sendPacket(
+          _dtmfPayload(event, false, volume, duration),
+          pt,
+          start,
+          marker: i == 1,
+        );
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
       final total = steps * 160;
@@ -269,8 +284,22 @@ class RtpSession {
 
   static int? _dtmfEvent(String digit) {
     const map = {
-      '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-      '8': 8, '9': 9, '*': 10, '#': 11, 'A': 12, 'B': 13, 'C': 14, 'D': 15,
+      '0': 0,
+      '1': 1,
+      '2': 2,
+      '3': 3,
+      '4': 4,
+      '5': 5,
+      '6': 6,
+      '7': 7,
+      '8': 8,
+      '9': 9,
+      '*': 10,
+      '#': 11,
+      'A': 12,
+      'B': 13,
+      'C': 14,
+      'D': 15,
     };
     return map[digit.toUpperCase()];
   }
@@ -284,8 +313,12 @@ class RtpSession {
     ]);
   }
 
-  void _sendPacket(Uint8List payload, int payloadType, int timestamp,
-      {bool marker = false}) {
+  void _sendPacket(
+    Uint8List payload,
+    int payloadType,
+    int timestamp, {
+    bool marker = false,
+  }) {
     final sender = _sender;
     final address = _remoteAddress;
     final port = _remotePort;
